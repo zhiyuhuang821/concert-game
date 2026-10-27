@@ -29,7 +29,7 @@
       background: rgba(0,0,0,0.85);
       display: flex; flex-direction: column;
       justify-content: center; align-items: center;
-      gap: 20px; color: #fff; text-align: center; padding: 20px;
+      gap: 15px; color: #fff; text-align: center; padding: 20px;
       backdrop-filter: blur(4px);
       z-index: 10;
     }
@@ -60,6 +60,7 @@
       font-family: inherit; font-size: 16px; padding: 10px 24px;
       background: #4ecdc4; color: #111; border: none; cursor: pointer;
       box-shadow: 4px 4px 0 #fff; font-weight: bold; margin-top: 10px;
+      border-radius: 4px;
     }
     button:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 #fff; }
     
@@ -70,6 +71,20 @@
       position: absolute; bottom: 30px; right: 20px;
       background: transparent; color: #666; border: none; box-shadow: none;
       font-size: 12px; cursor: pointer; z-index: 10;
+    }
+    
+    /* 新增：播放按钮的专属样式 */
+    #play-song-btn {
+      display: none;
+      background: #ffd93d;
+      font-size: 18px;
+      padding: 12px 30px;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0% { transform: scale(1); box-shadow: 4px 4px 0 #fff; }
+      50% { transform: scale(1.05); box-shadow: 6px 6px 0 #fff; }
+      100% { transform: scale(1); box-shadow: 4px 4px 0 #fff; }
     }
   </style>
 </head>
@@ -93,6 +108,9 @@
       <h1 id="end-title">CLEAR!</h1>
       <p id="end-desc">即将播放...</p>
       
+      <!-- 👇 新增：播放歌曲按钮 -->
+      <button id="play-song-btn">▶ 点击播放歌曲</button>
+      
       <button id="replay-btn" style="display: none;">再玩一次</button>
       
       <div id="hidden-prompt" class="btn-group" style="display: none;">
@@ -104,18 +122,16 @@
     <button id="skip-btn">SKIP >></button>
   </div>
 
-  <!-- 背景音乐 -->
   <audio id="bgmIntro" src="bgm_intro.mp3" loop preload="auto"></audio>
   <audio id="bgmGame" src="bgm_game.mp3" loop preload="auto"></audio>
   <audio id="sfxClick" src="sfx_click.mp3" preload="auto"></audio>
 
-  <!-- 你已经传好的图床直链 -->
+  <!-- 你的图床直链 -->
   <audio id="mediaA" src="https://img2.tofaka.com/autoupload/fr/RjuSsJ9JQoUpZL0vII50cXZYE_SgiGgbUM4XMNu-bqCyl5f0KlZfm6UsKj-HyTuv/20261027/RLMp/songA.mp3" preload="auto"></audio>
   <audio id="mediaB" src="https://img2.tofaka.com/autoupload/fr/RjuSsJ9JQoUpZL0vII50cXZYE_SgiGgbUM4XMNu-bqCyl5f0KlZfm6UsKj-HyTuv/20261027/AofP/songB.mp3" preload="auto"></audio>
   <audio id="mediaC" src="https://img2.tofaka.com/autoupload/fr/RjuSsJ9JQoUpZL0vII50cXZYE_SgiGgbUM4XMNu-bqCyl5f0KlZfm6UsKj-HyTuv/20261027/Aem4/songC.mp3" preload="auto"></audio>
   <audio id="mediaD" src="https://img2.tofaka.com/autoupload/fr/RjuSsJ9JQoUpZL0vII50cXZYE_SgiGgbUM4XMNu-bqCyl5f0KlZfm6UsKj-HyTuv/20261027/C1Fm/songD.mp3" preload="auto"></audio>
   
-  <!-- 如果你也把失败和隐藏音频传了图床，记得替换下面两个链接 -->
   <audio id="mediaFail" src="fail.mp3" preload="auto"></audio>
   <audio id="mediaHidden" src="songHidden.mp3" preload="auto"></audio>
 
@@ -160,6 +176,8 @@
     const hiddenAnim = document.getElementById('hidden-anim');
     const startBtn = document.getElementById('start-btn');
     const replayBtn = document.getElementById('replay-btn');
+    const playSongBtn = document.getElementById('play-song-btn'); // 新增
+    
     const hiddenPrompt = document.getElementById('hidden-prompt');
     const unlockHiddenBtn = document.getElementById('unlock-hidden-btn');
     const skipHiddenBtn = document.getElementById('skip-hidden-btn');
@@ -178,7 +196,6 @@
     const sfxClick = document.getElementById('sfxClick');
 
     let currentBest = 'A'; 
-
     let playerX, items, frameCount, score, gameOver, counts;
     let running = false;
     let expressionTimer = 0, currentExpression = 'normal'; 
@@ -208,6 +225,7 @@
       failAnim.style.display = 'none';
       hiddenAnim.style.display = 'none';
       replayBtn.style.display = 'none';
+      playSongBtn.style.display = 'none'; // 重置隐藏
       hiddenPrompt.style.display = 'none';
       
       Object.values(medias).forEach(m => { m.pause(); m.currentTime = 0; });
@@ -409,10 +427,10 @@
           
           albumImg.style.display = 'block';
           albumImg.src = `album${currentBest}.jpg`; 
-          endDesc.innerText = `接住最多的是 ${ITEM_NAMES[currentBest]}\n正在播放歌曲...`;
-          replayBtn.style.display = 'block';
+          endDesc.innerText = `接住最多的是 ${ITEM_NAMES[currentBest]}`;
           
-          medias[currentBest].play().catch(e => console.log('播放被拦截：', e));
+          playSongBtn.style.display = 'inline-block'; // 👈 显示播放按钮，而不是自动播放
+          replayBtn.style.display = 'block';
         }
         
       } else {
@@ -430,9 +448,18 @@
           failAnim.src = isHurtFrame ? 'player_hurt.png' : 'player_normal.png';
           isHurtFrame = !isHurtFrame;
         }, 150); 
+        // 失败音乐依然尝试自动播（为了被炸晕的突然感）
         medias.Fail.play().catch(e => console.log('播放被拦截：', e));
       }
     }
+
+    // 👇 为播放按钮添加点击事件
+    playSongBtn.addEventListener('click', () => {
+      playClick();
+      playSongBtn.style.display = 'none'; // 点了就隐藏按钮
+      // 用户点击了按钮，浏览器就不会拦截声音了，瞬间秒出
+      medias[currentBest].play().catch(e => console.log('播放失败：', e)); 
+    });
 
     unlockHiddenBtn.addEventListener('click', () => {
       playClick();
@@ -461,10 +488,13 @@
       
       albumImg.style.display = 'block';
       albumImg.src = `album${best}.jpg`; 
-      endDesc.innerText = `接住最多的是 ${ITEM_NAMES[best]}\n正在播放歌曲...`;
+      endDesc.innerText = `接住最多的是 ${ITEM_NAMES[best]}`;
+      
+      playSongBtn.style.display = 'inline-block'; // 👈 跳过隐藏也显示播放按钮
       replayBtn.style.display = 'block';
       
-      medias[best].play().catch(e => console.log('播放被拦截：', e));
+      // 这里不自动播放，等用户点按钮
+      currentBest = best; 
     });
 
     function startGame() {
