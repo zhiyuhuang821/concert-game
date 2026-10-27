@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>follow</title>
+  <style>
+    body {
+      background: #1a1a1a; 
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      font-family: "Courier New", monospace;
+      touch-action: none; 
+      overflow: hidden;
+    }
+    #game-wrap { position: relative; width: 360px; height: 640px; max-width: 100vw; max-height: 100vh; }
+    canvas { 
+      background: #2a2a35; 
+      display: block; 
+      width: 100%; height: 100%;
+      image-rendering: pixelated;
+      touch-action: none;
+    }
+    .overlay {
+      position: absolute; inset: 0;
+      background: rgba(0,0,0,0.85);
+      display: flex; flex-direction: column;
+      justify-content: center; align-items: center;
+      gap: 20px; color: #fff; text-align: center; padding: 20px;
+      backdrop-filter: blur(4px);
+    }
+    .overlay.hidden { display: none; }
+    .overlay h1 { color: #ffd93d; font-size: 26px; margin: 0; text-shadow: 2px 2px 0 #000; }
+    .overlay p { font-size: 14px; color: #ccc; line-height: 1.5; }
+    
+    #album-img {
+      width: 220px; height: 220px;
+      border: 4px solid #4ecdc4; border-radius: 8px;
+      object-fit: cover; box-shadow: 0 0 20px rgba(78, 205, 196, 0.4);
+      display: none; margin-bottom: 10px; background: #222;
+    }
+
+    button {
+      font-family: inherit; font-size: 16px; padding: 10px 24px;
+      background: #4ecdc4; color: #111; border: none; cursor: pointer;
+      box-shadow: 4px 4px 0 #fff; font-weight: bold; margin-top: 10px;
+    }
+    button:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 #fff; }
+  </style>
+</head>
+<body>
+  <div id="game-wrap">
+    <canvas id="game" width="360" height="640"></canvas>
+
+    <div id="start-screen" class="overlay">
+      <h1>PIXEL CATCH</h1>
+      <p>左右移动，接住掉落物<br>小心 hurt 扣分！</p>
+      <button id="start-btn">TAP TO START</button>
+    </div>
+
+    <div id="end-screen" class="overlay hidden">
+      <img id="album-img" src="album.png" alt="Album Cover" onerror="this.style.display='none'">
+      <h1 id="end-title">CLEAR!</h1>
+      <p id="end-desc">正在播放...</p>
+      <button id="replay-btn">再玩一次</button>
+    </div>
+  </div>
+
+  <audio id="audioA" src="songA.mp3" preload="auto"></audio>
+  <audio id="audioB" src="songB.mp3" preload="auto"></audio>
+  <audio id="audioC" src="songC.mp3" preload="auto"></audio>
+  <audio id="audioD" src="songD.mp3" preload="auto"></audio>
+  <audio id="audioFail" src="fail.mp3" preload="auto"></audio>
+
+  <script>
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+
+    ctx.imageSmoothingEnabled = false;
+
+    // ===== 参数设置 =====
+    const PLAYER_W = 128; // 小人调回 128
+    const PLAYER_H = 128; 
+    const PLAYER_Y = H - 150; 
+
+    const ITEM_SIZE = 56; 
+
+    const SPAWN_INTERVAL = 45, BASE_SPEED = 2.2;
+    const TARGET_SCORE = 20;
+    const MAX_FAILS = 5;
+
+    // ===== 加载图片 =====
+    // 背景图
+    const imgBg = new Image(); imgBg.src = 'bg.png';
+    // 小人
+    const imgNormal = new Image(); imgNormal.src = 'player_normal.png';
+    const imgHappy  = new Image(); imgHappy.src = 'player_happy.png';
+    const imgHurt   = new Image(); imgHurt.src = 'player_hurt.png';
+    // 物品
+    const itemImgs = {
+      A: new Image(), B: new Image(), C: new Image(), D: new Image(), X: new Image()
+    };
+    itemImgs.A.src = 'A.png'; 
+    itemImgs.B.src = 'B.png';
+    itemImgs.C.src = 'C.png'; 
+    itemImgs.D.src = 'D.png';
+    itemImgs.X.src = 'hurt.png'; 
+
+    const TYPES = {
+      A: { color: '#ffd93d', score: 1,  label: 'A' },
+      B: { color: '#ff6b9d', score: 1,  label: 'B' },
+      C: { color: '#4ecdc4', score: 1,  label: 'C' },
+      D: { color: '#b388ff', score: 1,  label: 'D' },
+      X: { color: '#e94560', score: -1, label: 'X' }
+    };
+
+    const startScreen = document.getElementById('start-screen');
+    const endScreen = document.getElementById('end-screen');
+    const endTitle = document.getElementById('end-title');
+    const endDesc = document.getElementById('end-desc');
+    const albumImg = document.getElementById('album-img');
+    const startBtn = document.getElementById('start-btn');
+    const replayBtn = document.getElementById('replay-btn');
+    
+    const audios = {
+      A: document.getElementById('audioA'), B: document.getElementById('audioB'),
+      C: document.getElementById('audioC'), D: document.getElementById('audioD'),
+      Fail: document.getElementById('audioFail')
+    };
+
+    let playerX, items, frameCount, score, gameOver, counts;
+    let running = false;
+    let expressionTimer = 0; 
+    let currentExpression = 'normal'; 
+
+    function initGame() {
+      playerX = W / 2 - PLAYER_W / 2;
+      items = [];
+      frameCount = 0;
+      score = 0;
+      counts = { A: 0, B: 0, C: 0, D: 0, X: 0 };
+      gameOver = false;
+      expressionTimer = 0;
+      currentExpression = 'normal';
+      
+      Object.values(audios).forEach(a => {
+        a.pause(); a.currentTime = 0;
+      });
+    }
+
+    function movePlayerTo(clientX) {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = W / rect.width;
+      playerX = (clientX - rect.left) * scaleX - PLAYER_W / 2;
+      playerX = Math.max(0, Math.min(W - PLAYER_W, playerX));
+    }
+
+    canvas.addEventListener('mousemove', (e) => { if (running) movePlayerTo(e.clientX); });
+    canvas.addEventListener('touchstart', (e) => { if (running) { e.preventDefault(); movePlayerTo(e.touches[0].clientX); } }, { passive: false });
+    canvas.addEventListener('touchmove', (e) => { if (running) { e.preventDefault(); movePlayerTo(e.touches[0].clientX); } }, { passive: false });
+
+    function randomType() {
+      const r = Math.random();
+      if (r < 0.20) return 'A';
+      if (r < 0.40) return 'B';
+      if (r < 0.60) return 'C';
+      if (r < 0.85) return 'D'; 
+      return 'X'; 
+    }
+
+    function spawnItem() {
+      items.push({
+        type: randomType(),
+        x: Math.random() * (W - ITEM_SIZE),
+        y: -ITEM_SIZE,
+        speed: BASE_SPEED + Math.random() * 1.5
+      });
+    }
+
+    function update() {
+      if (gameOver) return;
+      frameCount++;
+      if (frameCount % SPAWN_INTERVAL === 0) spawnItem();
+
+      if (expressionTimer > 0) {
+        expressionTimer--;
+        if (expressionTimer === 0) currentExpression = 'normal';
+      }
+
+      for (let i = items.length - 1; i >= 0; i--) {
+        const it = items[i];
+        it.y += it.speed;
+
+        const hitY = it.y + ITEM_SIZE >= PLAYER_Y + 25 && it.y + ITEM_SIZE <= PLAYER_Y + PLAYER_H;
+        const hitX = it.x + ITEM_SIZE > playerX && it.x < playerX + PLAYER_W;
+
+        if (hitY && hitX) {
+          const def = TYPES[it.type];
+          counts[it.type]++;
+          score += def.score;
+          if (score < 0) score = 0;
+
+          if (it.type === 'X') {
+            currentExpression = 'hurt';
+            expressionTimer = 45; 
+          } else {
+            currentExpression = 'happy';
+            expressionTimer = 25; 
+          }
+
+          if (score >= TARGET_SCORE) { endGame(true); return; }
+          if (counts.X >= MAX_FAILS) { endGame(false); return; }
+
+          items.splice(i, 1);
+          continue;
+        }
+
+        if (it.y > H) items.splice(i, 1);
+      }
+    }
+
+    function draw() {
+      // ===== 绘制背景 =====
+      if (imgBg.complete && imgBg.naturalWidth > 0) {
+        // 如果你画了 bg.png，就铺满整个画布
+        ctx.drawImage(imgBg, 0, 0, W, H);
+      } else {
+        // 如果找不到 bg.png，就用纯色垫底
+        ctx.fillStyle = '#2a2a35'; 
+        ctx.fillRect(0, 0, W, H);
+      }
+
+      // 绘制物品
+      items.forEach(it => {
+        const def = TYPES[it.type];
+        const img = itemImgs[it.type];
+        
+        if (img.complete && img.naturalWidth > 0) {
+          ctx.drawImage(img, it.x, it.y, ITEM_SIZE, ITEM_SIZE);
+        } else {
+          ctx.fillStyle = def.color;
+          ctx.fillRect(it.x, it.y, ITEM_SIZE, ITEM_SIZE);
+        }
+      });
+
+      // 绘制小人
+      let activeImg = imgNormal;
+      if (currentExpression === 'happy' && imgHappy.complete) activeImg = imgHappy;
+      if (currentExpression === 'hurt' && imgHurt.complete) activeImg = imgHurt;
+      
+      if (activeImg.complete && activeImg.naturalWidth > 0) {
+        ctx.drawImage(activeImg, playerX, PLAYER_Y, PLAYER_W, PLAYER_H);
+      } else {
+        ctx.fillStyle = currentExpression === 'hurt' ? '#ff0000' : (currentExpression === 'happy' ? '#ffd93d' : '#4ecdc4');
+        ctx.fillRect(playerX, PLAYER_Y, PLAYER_W, PLAYER_H);
+      }
+
+      // 绘制 UI
+      ctx.fillStyle = '#fff';
+      ctx.font = '16px "Courier New", monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText(`SCORE ${score}/${TARGET_SCORE}`, 12, 24);
+      
+      ctx.fillStyle = '#e94560';
+      ctx.fillText(`FAILS ${counts.X}/${MAX_FAILS}`, 12, 48);
+    }
+
+    function loop() {
+      if (!running) return;
+      update();
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    function endGame(isClear) {
+      running = false;
+      gameOver = true;
+      endScreen.classList.remove('hidden');
+
+      if (isClear) {
+        endTitle.innerText = 'CLEAR!';
+        endTitle.style.color = '#ffd93d';
+        
+        let best = 'A';
+        ['B', 'C', 'D'].forEach(t => {
+          if (counts[t] > counts[best]) best = t;
+        });
+        endDesc.innerText = `你接住最多的是 ${best} 掉落物`;
+        albumImg.style.display = 'block';
+        audios[best].play().catch(e => console.log('播放被拦截：', e));
+      } else {
+        endTitle.innerText = 'GAME OVER';
+        endTitle.style.color = '#e94560';
+        endDesc.innerText = `接住了太多 hurt！`;
+        albumImg.style.display = 'none'; 
+        audios.Fail.play().catch(e => console.log('播放被拦截：', e));
+      }
+    }
+
+    function startGame() {
+      initGame();
+      startScreen.classList.add('hidden');
+      endScreen.classList.add('hidden');
+      
+      Object.values(audios).forEach(a => {
+        a.volume = 0;
+        a.play().then(() => { a.pause(); a.currentTime = 0; a.volume = 1; }).catch(() => {});
+      });
+
+      running = true;
+      draw();
+      loop();
+    }
+
+    startBtn.addEventListener('click', startGame);
+    replayBtn.addEventListener('click', startGame);
+  </script>
+</body>
+</html>
