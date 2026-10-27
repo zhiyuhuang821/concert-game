@@ -46,9 +46,20 @@
     
     #album-img {
       width: 100%; height: 100%;
-      border: 4px solid #4ecdc4; border-radius: 8px;
-      object-fit: cover; box-shadow: 0 0 20px rgba(78, 205, 196, 0.4);
+      border: 4px solid #4ecdc4; 
+      border-radius: 50%; 
+      object-fit: cover; 
+      box-shadow: 0 0 20px rgba(78, 205, 196, 0.4);
       display: none; background: #222;
+      transition: box-shadow 0.3s;
+    }
+    
+    #album-img.playing {
+      animation: spin 10s linear infinite; 
+      box-shadow: 0 0 30px #4ecdc4, inset 0 0 15px #4ecdc4; 
+    }
+    @keyframes spin { 
+      100% { transform: rotate(360deg); } 
     }
 
     #fail-anim, #hidden-anim {
@@ -108,7 +119,6 @@
       
       <h1 id="end-title">CLEAR!</h1>
       
-      <!-- 👇 新增的 LOADING 提示文字 -->
       <p id="loading-hint" style="display: none; color: #ffd93d; font-size: 14px; font-weight: bold; animation: blink 1s infinite;">LOADING...</p>
       
       <p id="end-desc">即将播放...</p>
@@ -156,6 +166,8 @@
     const imgHappy  = new Image(); imgHappy.src = 'player_happy.png';
     const imgHurt   = new Image(); imgHurt.src = 'player_hurt.png';
     
+    const imgMusic = new Image(); imgMusic.src = 'music.png';
+
     const itemImgs = { A: new Image(), B: new Image(), C: new Image(), D: new Image(), X: new Image() };
     itemImgs.A.src = 'A.png'; itemImgs.B.src = 'B.png'; itemImgs.C.src = 'C.png'; itemImgs.D.src = 'D.png'; itemImgs.X.src = 'hurt.png'; 
 
@@ -174,7 +186,7 @@
     const endTitle = document.getElementById('end-title');
     const endDesc = document.getElementById('end-desc');
     const albumImg = document.getElementById('album-img');
-    const loadingHint = document.getElementById('loading-hint'); // 获取 LOADING 元素
+    const loadingHint = document.getElementById('loading-hint'); 
     
     const failAnim = document.getElementById('fail-anim'); 
     const hiddenAnim = document.getElementById('hidden-anim');
@@ -210,6 +222,10 @@
     let hiddenAnimInterval = null;
     let hiddenFrameIndex = 1;
 
+    let isMusicPlaying = false;
+    let musicAnimFrame = 0;
+    let musicAnimReq = null;
+
     function playClick() {
       sfxClick.currentTime = 0; 
       sfxClick.volume = 0.6;
@@ -225,13 +241,18 @@
       if (failAnimInterval) clearInterval(failAnimInterval);
       if (hiddenAnimInterval) clearInterval(hiddenAnimInterval);
       
+      isMusicPlaying = false;
+      if (musicAnimReq) cancelAnimationFrame(musicAnimReq);
+      musicAnimFrame = 0;
+      
       albumImg.style.display = 'none';
+      albumImg.classList.remove('playing'); 
       failAnim.style.display = 'none';
       hiddenAnim.style.display = 'none';
       replayBtn.style.display = 'none';
       playSongBtn.style.display = 'none'; 
       hiddenPrompt.style.display = 'none';
-      loadingHint.style.display = 'none'; // 重置加载提示
+      loadingHint.style.display = 'none'; 
       
       Object.values(medias).forEach(m => { m.pause(); m.currentTime = 0; });
       bgmGame.pause(); bgmGame.currentTime = 0;
@@ -457,17 +478,46 @@
       }
     }
 
+    function startMusicEffect() {
+      isMusicPlaying = true;
+      musicAnimFrame = 0;
+      
+      function musicLoop() {
+        if (!isMusicPlaying) return;
+        musicAnimFrame++;
+
+        // 👇 核心修改：从 10 改成了 40，现在大概 1.5 秒才会切换一次表情，非常舒缓
+        const isHappy = Math.floor(musicAnimFrame / 40) % 2 === 0;
+        const activeFace = (isHappy && imgHappy.complete) ? imgHappy : imgNormal;
+        
+        if (activeFace.complete) {
+          ctx.drawImage(activeFace, 20, 60, 60, 60);
+        }
+        
+        if (imgMusic.complete) {
+          if (isHappy) {
+            ctx.drawImage(imgMusic, 85, 60, 30, 30);
+          }
+        }
+
+        requestAnimationFrame(musicLoop);
+      }
+      musicLoop();
+    }
+
     playSongBtn.addEventListener('click', () => {
       playClick();
       playSongBtn.style.display = 'none'; 
-      loadingHint.style.display = 'block'; // 👈 点击后显示 LOADING
+      loadingHint.style.display = 'block'; 
       
-      // 👇 播放成功（promise resolve）后隐藏 LOADING
+      albumImg.classList.add('playing'); 
+      startMusicEffect(); 
+      
       medias[currentBest].play().then(() => {
         loadingHint.style.display = 'none';
       }).catch(e => {
         console.log('播放失败：', e);
-        loadingHint.style.display = 'none'; // 失败也隐藏
+        loadingHint.style.display = 'none'; 
       }); 
     });
 
@@ -486,9 +536,11 @@
         hiddenAnim.src = `hidden${hiddenFrameIndex}.png`;
       }, 800);
 
-      loadingHint.style.display = 'block'; // 👈 显示 LOADING
+      loadingHint.style.display = 'block'; 
+      startMusicEffect(); 
+      
       medias.Hidden.play().then(() => {
-        loadingHint.style.display = 'none'; // 👈 成功后隐藏
+        loadingHint.style.display = 'none'; 
       }).catch(e => {
         console.log('播放被拦截：', e);
         loadingHint.style.display = 'none';
