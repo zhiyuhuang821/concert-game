@@ -31,16 +31,45 @@
       justify-content: center; align-items: center;
       gap: 20px; color: #fff; text-align: center; padding: 20px;
       backdrop-filter: blur(4px);
+      z-index: 10;
     }
     .overlay.hidden { display: none; }
     .overlay h1 { color: #ffd93d; font-size: 26px; margin: 0; text-shadow: 2px 2px 0 #000; }
-    .overlay p { font-size: 14px; color: #ccc; line-height: 1.5; }
+    .overlay p { font-size: 15px; color: #ccc; line-height: 1.6; margin: 5px 0; }
+    
+    .media-container {
+      width: 220px; height: 220px;
+      margin-bottom: 5px;
+      position: relative;
+      display: flex; justify-content: center; align-items: center;
+    }
     
     #album-img {
-      width: 220px; height: 220px;
+      width: 100%; height: 100%;
       border: 4px solid #4ecdc4; border-radius: 8px;
       object-fit: cover; box-shadow: 0 0 20px rgba(78, 205, 196, 0.4);
-      display: none; margin-bottom: 10px; background: #222;
+      display: none; background: #222;
+      cursor: pointer;
+    }
+
+    #video-player {
+      width: 100%; height: 100%;
+      border: 4px solid #4ecdc4; border-radius: 8px;
+      object-fit: cover; box-shadow: 0 0 20px rgba(78, 205, 196, 0.4);
+      display: none; background: #000;
+      outline: none;
+    }
+
+    #click-hint {
+      color: #ffd93d; font-size: 13px; font-weight: bold;
+      display: none; animation: blink 1.2s infinite;
+      cursor: pointer; margin-top: -10px;
+    }
+    @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+
+    #fail-anim, #hidden-anim {
+      width: 100%; height: 100%;
+      display: none; image-rendering: pixelated;
     }
 
     button {
@@ -50,6 +79,9 @@
     }
     button:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 #fff; }
     
+    .btn-group { display: flex; gap: 15px; margin-top: 10px; }
+    .btn-yes { background: #b388ff; }
+
     #skip-btn {
       position: absolute; bottom: 30px; right: 20px;
       background: transparent; color: #666; border: none; box-shadow: none;
@@ -68,20 +100,39 @@
     </div>
 
     <div id="end-screen" class="overlay hidden">
-      <img id="album-img" src="album.png" alt="Album Cover" onerror="this.style.display='none'">
+      <div class="media-container">
+        <img id="album-img" src="" alt="Album Cover" onerror="this.style.display='none'">
+        <video id="video-player" playsinline controls style="display:none;"></video>
+        
+        <img id="fail-anim" src="player_normal.png" alt="Fail Animation">
+        <img id="hidden-anim" src="hidden1.png" alt="Hidden Animation">
+      </div>
+      
+      <p id="click-hint">Click to watch the video ▶</p>
+
       <h1 id="end-title">CLEAR!</h1>
-      <p id="end-desc">正在播放...</p>
-      <button id="replay-btn">再玩一次</button>
+      <p id="end-desc">即将播放...</p>
+      
+      <button id="replay-btn" style="display: none;">再玩一次</button>
+      
+      <div id="hidden-prompt" class="btn-group" style="display: none;">
+        <button id="unlock-hidden-btn" class="btn-yes">是，解锁隐藏！</button>
+        <button id="skip-hidden-btn">跳过</button>
+      </div>
     </div>
 
     <button id="skip-btn">SKIP >></button>
   </div>
 
-  <audio id="audioA" src="songA.mp3" preload="auto"></audio>
-  <audio id="audioB" src="songB.mp3" preload="auto"></audio>
-  <audio id="audioC" src="songC.mp3" preload="auto"></audio>
-  <audio id="audioD" src="songD.mp3" preload="auto"></audio>
-  <audio id="audioFail" src="fail.mp3" preload="auto"></audio>
+  <audio id="bgmIntro" src="bgm_intro.wav" loop></audio>
+  <audio id="bgmGame" src="bgm_game.mp3" loop></audio>
+  <audio id="sfxClick" src="sfx_click.wav"></audio>
+
+  <audio id="mediaC" src="songC.mp3" preload="auto"></audio>
+  <audio id="mediaFail" src="fail.mp3" preload="auto"></audio>
+  
+  <!-- 👇 修复：改回 audio 标签了，因为 C 是音频 -->
+  <audio id="mediaHidden" src="songHidden.mp3" preload="auto"></audio>
 
   <script>
     const canvas = document.getElementById('game');
@@ -90,37 +141,21 @@
 
     ctx.imageSmoothingEnabled = false;
 
-    const PLAYER_W = 176; 
-    const PLAYER_H = 176; 
-    const PLAYER_Y = H - 170; 
-    const PLAYER_EDGE_PADDING = 40; 
-
-    const ITEM_SIZE = 64; 
-    const SPAWN_INTERVAL = 50; 
-    const BASE_SPEED = 1.8; 
-    const TARGET_SCORE = 20;
-    const MAX_FAILS = 5;
+    const PLAYER_W = 176, PLAYER_H = 176, PLAYER_Y = H - 170, PLAYER_EDGE_PADDING = 40; 
+    const ITEM_SIZE = 64, SPAWN_INTERVAL = 50, BASE_SPEED = 1.8, TARGET_SCORE = 20, MAX_FAILS = 5;
 
     const imgBg = new Image(); imgBg.src = 'bg.png';
-    
-    // 鸟变大：从 72x48 变成 144x96
     const BIRD_W = 144, BIRD_H = 96; 
     const imgBirdLeft = new Image(); imgBirdLeft.src = 'bird_left.png';
     const imgBirdRight = new Image(); imgBirdRight.src = 'bird_right.png';
-    
     const imgNormal = new Image(); imgNormal.src = 'player_normal.png';
     const imgHappy  = new Image(); imgHappy.src = 'player_happy.png';
     const imgHurt   = new Image(); imgHurt.src = 'player_hurt.png';
     
-    const itemImgs = {
-      A: new Image(), B: new Image(), C: new Image(), D: new Image(), X: new Image()
-    };
-    itemImgs.A.src = 'A.png'; 
-    itemImgs.B.src = 'B.png';
-    itemImgs.C.src = 'C.png'; 
-    itemImgs.D.src = 'D.png';
-    itemImgs.X.src = 'hurt.png'; 
+    const itemImgs = { A: new Image(), B: new Image(), C: new Image(), D: new Image(), X: new Image() };
+    itemImgs.A.src = 'A.png'; itemImgs.B.src = 'B.png'; itemImgs.C.src = 'C.png'; itemImgs.D.src = 'D.png'; itemImgs.X.src = 'hurt.png'; 
 
+    const ITEM_NAMES = { A: '❤️', B: '🎤', C: '⛰️', D: '🧋' };
     const TYPES = {
       A: { color: '#ffd93d', score: 1,  label: 'A' },
       B: { color: '#ff6b9d', score: 1,  label: 'B' },
@@ -135,41 +170,67 @@
     const endTitle = document.getElementById('end-title');
     const endDesc = document.getElementById('end-desc');
     const albumImg = document.getElementById('album-img');
+    const videoPlayer = document.getElementById('video-player');
+    const clickHint = document.getElementById('click-hint');
+    
+    const failAnim = document.getElementById('fail-anim'); 
+    const hiddenAnim = document.getElementById('hidden-anim');
     const startBtn = document.getElementById('start-btn');
     const replayBtn = document.getElementById('replay-btn');
+    const hiddenPrompt = document.getElementById('hidden-prompt');
+    const unlockHiddenBtn = document.getElementById('unlock-hidden-btn');
+    const skipHiddenBtn = document.getElementById('skip-hidden-btn');
     
-    const audios = {
-      A: document.getElementById('audioA'), B: document.getElementById('audioB'),
-      C: document.getElementById('audioC'), D: document.getElementById('audioD'),
-      Fail: document.getElementById('audioFail')
+    const medias = {
+      C: document.getElementById('mediaC'), Fail: document.getElementById('mediaFail'), Hidden: document.getElementById('mediaHidden')
     };
+
+    const bgmIntro = document.getElementById('bgmIntro');
+    const bgmGame = document.getElementById('bgmGame');
+    const sfxClick = document.getElementById('sfxClick');
+
+    let currentBest = 'A'; 
 
     let playerX, items, frameCount, score, gameOver, counts;
     let running = false;
-    let expressionTimer = 0; 
-    let currentExpression = 'normal'; 
+    let expressionTimer = 0, currentExpression = 'normal'; 
+    let birds = [], BIRD_SPAWN_INTERVAL = 150; 
+    let isPlayingIntro = true, introFrame = 0, introPlayerX = -PLAYER_W; 
+    
+    let failAnimInterval = null;
+    let hiddenAnimInterval = null;
+    let hiddenFrameIndex = 1;
 
-    let birds = [];
-    const BIRD_SPAWN_INTERVAL = 150; 
-
-    let isPlayingIntro = true;
-    let introFrame = 0;
-    let introPlayerX = -PLAYER_W; 
+    function playClick() {
+      sfxClick.currentTime = 0; 
+      sfxClick.volume = 0.6;
+      sfxClick.play().catch(() => {});
+    }
 
     function initGame() {
       playerX = W / 2 - PLAYER_W / 2;
-      items = [];
-      birds = [];
-      frameCount = 0;
-      score = 0;
+      items = []; birds = []; frameCount = 0; score = 0;
       counts = { A: 0, B: 0, C: 0, D: 0, X: 0 };
-      gameOver = false;
-      expressionTimer = 0;
-      currentExpression = 'normal';
+      gameOver = false; expressionTimer = 0; currentExpression = 'normal';
       
-      Object.values(audios).forEach(a => {
-        a.pause(); a.currentTime = 0;
-      });
+      if (failAnimInterval) clearInterval(failAnimInterval);
+      if (hiddenAnimInterval) clearInterval(hiddenAnimInterval);
+      
+      albumImg.style.display = 'none';
+      videoPlayer.style.display = 'none';
+      videoPlayer.pause();
+      videoPlayer.currentTime = 0;
+      
+      clickHint.style.display = 'none';
+      failAnim.style.display = 'none';
+      hiddenAnim.style.display = 'none';
+      replayBtn.style.display = 'none';
+      hiddenPrompt.style.display = 'none';
+      
+      medias.C.pause(); medias.C.currentTime = 0;
+      medias.Fail.pause(); medias.Fail.currentTime = 0;
+      medias.Hidden.pause(); medias.Hidden.currentTime = 0;
+      bgmGame.pause(); bgmGame.currentTime = 0;
     }
 
     function movePlayerTo(clientX) {
@@ -185,10 +246,8 @@
 
     function randomType() {
       const r = Math.random();
-      if (r < 0.20) return 'A';
-      if (r < 0.40) return 'B';
-      if (r < 0.60) return 'C';
-      if (r < 0.85) return 'D'; 
+      if (r < 0.20) return 'A'; if (r < 0.40) return 'B';
+      if (r < 0.60) return 'C'; if (r < 0.85) return 'D'; 
       return 'X'; 
     }
 
@@ -205,11 +264,7 @@
       const y = 50 + Math.random() * (H / 2 - 100);
       const speed = 2 + Math.random() * 3; 
       const fromLeft = Math.random() < 0.5;
-      
-      const x = fromLeft ? -BIRD_W : W;
-      const vx = fromLeft ? speed : -speed;
-
-      birds.push({ x, y, vx, fromLeft });
+      birds.push({ x: fromLeft ? -BIRD_W : W, y, vx: fromLeft ? speed : -speed, fromLeft });
     }
 
     function update() {
@@ -217,10 +272,7 @@
       frameCount++;
 
       if (frameCount % SPAWN_INTERVAL === 0) spawnItem();
-      
-      if (frameCount % BIRD_SPAWN_INTERVAL === 0 && imgBirdLeft.complete && imgBirdRight.complete) {
-        spawnBird();
-      }
+      if (frameCount % BIRD_SPAWN_INTERVAL === 0 && imgBirdLeft.complete && imgBirdRight.complete) spawnBird();
 
       if (expressionTimer > 0) {
         expressionTimer--;
@@ -228,23 +280,16 @@
       }
 
       for (let i = birds.length - 1; i >= 0; i--) {
-        const b = birds[i];
-        b.x += b.vx;
-        if ((b.vx > 0 && b.x > W) || (b.vx < 0 && b.x < -BIRD_W)) {
-          birds.splice(i, 1);
-        }
+        const b = birds[i]; b.x += b.vx;
+        if ((b.vx > 0 && b.x > W) || (b.vx < 0 && b.x < -BIRD_W)) birds.splice(i, 1);
       }
 
       for (let i = items.length - 1; i >= 0; i--) {
         const it = items[i];
         it.y += it.speed;
 
-        // ===== 终极碰撞修复 =====
-        // 取小人的中心点和物品的中心点
         const playerCenterX = playerX + PLAYER_W / 2;
         const itemCenterX = it.x + ITEM_SIZE / 2;
-        
-        // 只要水平方向相差不超过 55 像素，且垂直方向到了小人头顶，就算接住
         const hitX = Math.abs(playerCenterX - itemCenterX) < 55;
         const hitY = it.y + ITEM_SIZE >= PLAYER_Y + 30 && it.y + ITEM_SIZE <= PLAYER_Y + PLAYER_H;
 
@@ -255,11 +300,9 @@
           if (score < 0) score = 0;
 
           if (it.type === 'X') {
-            currentExpression = 'hurt';
-            expressionTimer = 45; 
+            currentExpression = 'hurt'; expressionTimer = 45; 
           } else {
-            currentExpression = 'happy';
-            expressionTimer = 25; 
+            currentExpression = 'happy'; expressionTimer = 25; 
           }
 
           if (score >= TARGET_SCORE) { endGame(true); return; }
@@ -268,7 +311,6 @@
           items.splice(i, 1);
           continue;
         }
-
         if (it.y > H) items.splice(i, 1);
       }
     }
@@ -277,26 +319,20 @@
       if (imgBg.complete && imgBg.naturalWidth > 0) {
         ctx.drawImage(imgBg, 0, 0, W, H);
       } else {
-        ctx.fillStyle = '#2a2a35'; 
-        ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = '#2a2a35'; ctx.fillRect(0, 0, W, H);
       }
 
       birds.forEach(b => {
         const activeBirdImg = b.fromLeft ? imgBirdRight : imgBirdLeft;
-        if (activeBirdImg.complete) {
-          ctx.drawImage(activeBirdImg, b.x, b.y, BIRD_W, BIRD_H);
-        }
+        if (activeBirdImg.complete) ctx.drawImage(activeBirdImg, b.x, b.y, BIRD_W, BIRD_H);
       });
 
       items.forEach(it => {
-        const def = TYPES[it.type];
-        const img = itemImgs[it.type];
-        
+        const def = TYPES[it.type]; const img = itemImgs[it.type];
         if (img.complete && img.naturalWidth > 0) {
           ctx.drawImage(img, it.x, it.y, ITEM_SIZE, ITEM_SIZE);
         } else {
-          ctx.fillStyle = def.color;
-          ctx.fillRect(it.x, it.y, ITEM_SIZE, ITEM_SIZE);
+          ctx.fillStyle = def.color; ctx.fillRect(it.x, it.y, ITEM_SIZE, ITEM_SIZE);
         }
       });
 
@@ -311,132 +347,207 @@
         ctx.fillRect(playerX, PLAYER_Y, PLAYER_W, PLAYER_H);
       }
 
-      ctx.fillStyle = '#fff';
-      ctx.font = '16px "Courier New", monospace';
-      ctx.textAlign = 'left';
+      ctx.fillStyle = '#fff'; ctx.font = '16px "Courier New", monospace'; ctx.textAlign = 'left';
       ctx.fillText(`SCORE ${score}/${TARGET_SCORE}`, 12, 24);
-      
-      ctx.fillStyle = '#e94560';
-      ctx.fillText(`FAILS ${counts.X}/${MAX_FAILS}`, 12, 48);
+      ctx.fillStyle = '#e94560'; ctx.fillText(`FAILS ${counts.X}/${MAX_FAILS}`, 12, 48);
     }
 
     function loop() {
       if (!running) return;
-      update();
-      draw();
-      requestAnimationFrame(loop);
+      update(); draw(); requestAnimationFrame(loop);
     }
 
     function playIntro() {
-      isPlayingIntro = true;
-      introFrame = 0;
-      introPlayerX = -PLAYER_W; 
+      isPlayingIntro = true; introFrame = 0; introPlayerX = -PLAYER_W; 
       skipBtn.style.display = 'block';
+
+      bgmIntro.volume = 0.5;
+      bgmIntro.play().catch(() => {});
 
       function introLoop() {
         if (!isPlayingIntro) return;
-
         introFrame++;
-
-        ctx.fillStyle = '#111116';
-        ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = '#111116'; ctx.fillRect(0, 0, W, H);
 
         if (introFrame < 150) {
           introPlayerX += 3; 
-          if (introPlayerX > W / 2 - PLAYER_W / 2) {
-            introPlayerX = W / 2 - PLAYER_W / 2; 
-          }
+          if (introPlayerX > W / 2 - PLAYER_W / 2) introPlayerX = W / 2 - PLAYER_W / 2; 
         }
 
-        // 👇 表情切换速度变慢：从 10 改成 20
         const isHappyFrame = Math.floor(introFrame / 20) % 2 === 0;
-        
-        if (isHappyFrame && imgHappy.complete) {
-          ctx.drawImage(imgHappy, introPlayerX, PLAYER_Y, PLAYER_W, PLAYER_H);
-        } else if (imgNormal.complete) {
-          ctx.drawImage(imgNormal, introPlayerX, PLAYER_Y, PLAYER_W, PLAYER_H);
-        } else {
-          ctx.fillStyle = isHappyFrame ? '#ffd93d' : '#4ecdc4';
-          ctx.fillRect(introPlayerX, PLAYER_Y, PLAYER_W, PLAYER_H);
-        }
+        if (isHappyFrame && imgHappy.complete) ctx.drawImage(imgHappy, introPlayerX, PLAYER_Y, PLAYER_W, PLAYER_H);
+        else if (imgNormal.complete) ctx.drawImage(imgNormal, introPlayerX, PLAYER_Y, PLAYER_W, PLAYER_H);
+        else { ctx.fillStyle = isHappyFrame ? '#ffd93d' : '#4ecdc4'; ctx.fillRect(introPlayerX, PLAYER_Y, PLAYER_W, PLAYER_H); }
 
         if (introFrame > 100) {
-          ctx.fillStyle = '#ffd93d';
-          ctx.font = 'bold 24px "Courier New", monospace';
-          ctx.textAlign = 'center';
-          if (Math.floor(introFrame / 15) % 2 === 0) {
-            ctx.fillText('PIXEL CATCH', W / 2, H / 2 - 60);
-          }
+          ctx.fillStyle = '#ffd93d'; ctx.font = 'bold 24px "Courier New", monospace'; ctx.textAlign = 'center';
+          if (Math.floor(introFrame / 15) % 2 === 0) ctx.fillText('PIXEL CATCH', W / 2, H / 2 - 60);
         }
-
-        if (introFrame > 180) {
-          endIntro();
-          return;
-        }
-
+        if (introFrame > 180) { endIntro(); return; }
         requestAnimationFrame(introLoop);
       }
-
       introLoop();
     }
 
     function endIntro() {
-      isPlayingIntro = false;
-      skipBtn.style.display = 'none';
+      isPlayingIntro = false; skipBtn.style.display = 'none';
+      bgmIntro.pause(); 
       startScreen.classList.remove('hidden');
     }
 
-    skipBtn.addEventListener('click', endIntro);
+    skipBtn.addEventListener('click', () => { playClick(); endIntro(); });
 
     function endGame(isClear) {
       running = false;
       gameOver = true;
       endScreen.classList.remove('hidden');
+      bgmGame.pause(); 
 
       if (isClear) {
         endTitle.innerText = 'CLEAR!';
         endTitle.style.color = '#ffd93d';
+        endTitle.style.textShadow = '2px 2px 0 #000';
         
-        let best = 'A';
-        ['B', 'C', 'D'].forEach(t => {
-          if (counts[t] > counts[best]) best = t;
-        });
-        endDesc.innerText = `你接住最多的是 ${best} 掉落物`;
-        albumImg.style.display = 'block';
-        audios[best].play().catch(e => console.log('播放被拦截：', e));
+        let isHidden = (counts.A === counts.B && counts.B === counts.C && counts.C === counts.D && counts.A > 0); 
+        // let isHidden = (counts.A === counts.B && counts.B === counts.C && counts.C === counts.D && counts.A > 0);
+
+        if (isHidden) {
+          endTitle.innerText = 'HIDDEN ENDING?';
+          endTitle.style.color = '#b388ff';
+          endDesc.innerText = `恭喜你触发了隐藏结局！\n是否解锁？`;
+          albumImg.style.display = 'none'; 
+          hiddenPrompt.style.display = 'flex';
+        } else {
+          currentBest = 'A';
+          ['B', 'C', 'D'].forEach(t => { if (counts[t] > counts[currentBest]) currentBest = t; });
+          
+          albumImg.style.display = 'block';
+          albumImg.src = `album${currentBest}.jpg`; 
+          endDesc.innerText = `接住最多的是 ${ITEM_NAMES[currentBest]}\n即将播放对应歌曲...`;
+          replayBtn.style.display = 'block';
+          
+          if (['A', 'B', 'D'].includes(currentBest)) {
+             clickHint.style.display = 'block';
+          }
+
+          // 👇 延迟改成 2000 毫秒（2秒）
+          setTimeout(() => {
+            if (currentBest === 'C') {
+              medias.C.play().catch(e => console.log('播放被拦截：', e));
+            } else {
+              videoPlayer.style.display = 'none'; 
+              videoPlayer.src = `song${currentBest}.mp4`;
+              videoPlayer.play().catch(e => console.log('播放被拦截：', e));
+            }
+          }, 2000);
+        }
+        
       } else {
         endTitle.innerText = 'GAME OVER';
         endTitle.style.color = '#e94560';
-        endDesc.innerText = `接住了太多炸弹！`;
-        albumImg.style.display = 'none'; 
-        audios.Fail.play().catch(e => console.log('播放被拦截：', e));
+        endTitle.style.textShadow = '2px 2px 0 #ffd93d';
+        endDesc.innerText = `你接了太多炸弹！\n被炸晕了...`;
+        
+        albumImg.style.display = 'none';
+        clickHint.style.display = 'none'; 
+        failAnim.style.display = 'block';
+        replayBtn.style.display = 'block';
+        
+        let isHurtFrame = false;
+        failAnimInterval = setInterval(() => {
+          failAnim.src = isHurtFrame ? 'player_hurt.png' : 'player_normal.png';
+          isHurtFrame = !isHurtFrame;
+        }, 150); 
+        medias.Fail.play().catch(e => console.log('播放被拦截：', e));
       }
     }
 
+    function playVideo() {
+      playClick();
+      if (['A', 'B', 'D'].includes(currentBest)) {
+        const currentTime = videoPlayer.currentTime;
+        
+        albumImg.style.display = 'none';
+        clickHint.style.display = 'none';
+        videoPlayer.style.display = 'block';
+        
+        videoPlayer.currentTime = currentTime;
+        videoPlayer.play().catch(e => console.log('视频播放被拦截：', e));
+      }
+    }
+
+    albumImg.addEventListener('click', playVideo);
+    clickHint.addEventListener('click', playVideo);
+
+    unlockHiddenBtn.addEventListener('click', () => {
+      playClick();
+      hiddenPrompt.style.display = 'none';
+      endDesc.innerText = `正在播放隐藏旋律...`;
+      hiddenAnim.style.display = 'block';
+      
+      hiddenFrameIndex = 1;
+      hiddenAnim.src = `hidden1.png`;
+      
+      // 👇 动画切换速度从 300 毫秒拉长到 800 毫秒（近1秒一帧）
+      hiddenAnimInterval = setInterval(() => {
+        hiddenFrameIndex++;
+        if (hiddenFrameIndex > 4) hiddenFrameIndex = 1;
+        hiddenAnim.src = `hidden${hiddenFrameIndex}.png`;
+      }, 800);
+
+      // 👇 延迟改成 2000 毫秒（2秒）
+      setTimeout(() => {
+        medias.Hidden.play().catch(e => console.log('播放被拦截：', e));
+      }, 2000); 
+      replayBtn.style.display = 'block';
+    });
+
+    skipHiddenBtn.addEventListener('click', () => {
+      playClick();
+      hiddenPrompt.style.display = 'none';
+      let best = 'A';
+      ['B', 'C', 'D'].forEach(t => { if (counts[t] > counts[best]) best = t; });
+      
+      albumImg.style.display = 'block';
+      albumImg.src = `album${best}.jpg`; 
+      endDesc.innerText = `接住最多的是 ${ITEM_NAMES[best]}\n即将播放对应歌曲...`;
+      replayBtn.style.display = 'block';
+      
+      if (['A', 'B', 'D'].includes(best)) {
+          clickHint.style.display = 'block';
+      }
+      // 👇 延迟改成 2000 毫秒（2秒）
+      setTimeout(() => {
+        if (best === 'C') {
+          medias.C.play().catch(e => console.log('播放被拦截：', e));
+        } else {
+          videoPlayer.style.display = 'none';
+          videoPlayer.src = `song${best}.mp4`;
+          videoPlayer.play().catch(e => console.log('播放被拦截：', e));
+        }
+      }, 2000);
+    });
+
     function startGame() {
+      playClick();
       initGame();
       startScreen.classList.add('hidden');
       endScreen.classList.add('hidden');
       
-      Object.values(audios).forEach(a => {
-        a.volume = 0;
-        a.play().then(() => { a.pause(); a.currentTime = 0; a.volume = 1; }).catch(() => {});
-      });
+      bgmGame.volume = 0.4;
+      bgmGame.play().catch(() => {});
 
-      running = true;
-      draw();
-      loop();
+      running = true; draw(); loop();
     }
 
     startBtn.addEventListener('click', startGame);
     replayBtn.addEventListener('click', () => {
+        playClick();
         endScreen.classList.add('hidden');
         startGame();
     });
 
-    window.onload = () => {
-      setTimeout(playIntro, 500); 
-    };
+    window.onload = () => { setTimeout(playIntro, 500); };
   </script>
 </body>
 </html>
