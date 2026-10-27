@@ -34,9 +34,41 @@
       z-index: 10;
     }
     .overlay.hidden { display: none; }
-    .overlay h1 { color: #ffd93d; font-size: 26px; margin: 0; text-shadow: 2px 2px 0 #000; }
+    
+    .overlay h1 { 
+      color: #ffd93d; 
+      font-size: 26px; 
+      margin: 0; 
+      text-shadow: 2px 2px 0 #000; 
+      letter-spacing: 1px;
+      line-height: 1.2;
+      display: flex;
+      flex-direction: column;
+    }
     .overlay p { font-size: 15px; color: #ccc; line-height: 1.6; margin: 5px 0; }
     
+    /* 👇 调整了小人跳舞的位置和大小 */
+    .dance-container {
+      display: none;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 5px;
+      height: 36px;
+      position: absolute;
+      top: 15px;
+      left: 15px;
+      z-index: 20;
+    }
+    #dance-face {
+      height: 36px;
+      image-rendering: pixelated;
+    }
+    #dance-music {
+      height: 24px;
+      image-rendering: pixelated;
+      display: none; 
+    }
+
     .media-container {
       width: 220px; height: 220px;
       margin-bottom: 5px;
@@ -58,9 +90,7 @@
       animation: spin 10s linear infinite; 
       box-shadow: 0 0 30px #4ecdc4, inset 0 0 15px #4ecdc4; 
     }
-    @keyframes spin { 
-      100% { transform: rotate(360deg); } 
-    }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
 
     #fail-anim, #hidden-anim {
       width: 100%; height: 100%;
@@ -105,12 +135,22 @@
     <canvas id="game" width="360" height="640"></canvas>
 
     <div id="start-screen" class="overlay hidden">
-      <h1>PIXEL CATCH</h1>
+      <h1>
+        <span>VRM</span>
+        <span>PIXEL CATCH</span>
+      </h1>
       <p>左右移动，接住掉落物<br>小心炸弹扣分！</p>
       <button id="start-btn">TAP TO START</button>
     </div>
 
     <div id="end-screen" class="overlay hidden">
+      
+      <!-- 👇 小人跳舞容器，现在绝对在左上角 -->
+      <div id="dance-container" class="dance-container">
+        <img id="dance-face" src="player_normal.png" alt="face">
+        <img id="dance-music" src="music.png" alt="music">
+      </div>
+
       <div class="media-container">
         <img id="album-img" src="" alt="Album Cover" onerror="this.style.display='none'">
         <img id="fail-anim" src="player_normal.png" alt="Fail Animation">
@@ -166,8 +206,6 @@
     const imgHappy  = new Image(); imgHappy.src = 'player_happy.png';
     const imgHurt   = new Image(); imgHurt.src = 'player_hurt.png';
     
-    const imgMusic = new Image(); imgMusic.src = 'music.png';
-
     const itemImgs = { A: new Image(), B: new Image(), C: new Image(), D: new Image(), X: new Image() };
     itemImgs.A.src = 'A.png'; itemImgs.B.src = 'B.png'; itemImgs.C.src = 'C.png'; itemImgs.D.src = 'D.png'; itemImgs.X.src = 'hurt.png'; 
 
@@ -197,6 +235,10 @@
     const hiddenPrompt = document.getElementById('hidden-prompt');
     const unlockHiddenBtn = document.getElementById('unlock-hidden-btn');
     const skipHiddenBtn = document.getElementById('skip-hidden-btn');
+
+    const danceContainer = document.getElementById('dance-container');
+    const danceFace = document.getElementById('dance-face');
+    const danceMusic = document.getElementById('dance-music');
     
     const medias = {
       A: document.getElementById('mediaA'),
@@ -222,9 +264,8 @@
     let hiddenAnimInterval = null;
     let hiddenFrameIndex = 1;
 
-    let isMusicPlaying = false;
-    let musicAnimFrame = 0;
-    let musicAnimReq = null;
+    let danceInterval = null;
+    let danceState = false;
 
     function playClick() {
       sfxClick.currentTime = 0; 
@@ -240,10 +281,7 @@
       
       if (failAnimInterval) clearInterval(failAnimInterval);
       if (hiddenAnimInterval) clearInterval(hiddenAnimInterval);
-      
-      isMusicPlaying = false;
-      if (musicAnimReq) cancelAnimationFrame(musicAnimReq);
-      musicAnimFrame = 0;
+      if (danceInterval) clearInterval(danceInterval); 
       
       albumImg.style.display = 'none';
       albumImg.classList.remove('playing'); 
@@ -253,6 +291,7 @@
       playSongBtn.style.display = 'none'; 
       hiddenPrompt.style.display = 'none';
       loadingHint.style.display = 'none'; 
+      danceContainer.style.display = 'none'; 
       
       Object.values(medias).forEach(m => { m.pause(); m.currentTime = 0; });
       bgmGame.pause(); bgmGame.currentTime = 0;
@@ -405,8 +444,13 @@
         else { ctx.fillStyle = isHappyFrame ? '#ffd93d' : '#4ecdc4'; ctx.fillRect(introPlayerX, PLAYER_Y, PLAYER_W, PLAYER_H); }
 
         if (introFrame > 200) {
-          ctx.fillStyle = '#ffd93d'; ctx.font = 'bold 24px "Courier New", monospace'; ctx.textAlign = 'center';
-          if (Math.floor(introFrame / 15) % 2 === 0) ctx.fillText('PIXEL CATCH', W / 2, H / 2 - 60);
+          ctx.fillStyle = '#ffd93d'; 
+          ctx.font = 'bold 26px "Courier New", monospace'; 
+          ctx.textAlign = 'center';
+          if (Math.floor(introFrame / 15) % 2 === 0) {
+            ctx.fillText('VRM', W / 2, H / 2 - 80);
+            ctx.fillText('PIXEL CATCH', W / 2, H / 2 - 40);
+          }
         }
 
         if (introFrame > 100) {
@@ -478,31 +522,20 @@
       }
     }
 
-    function startMusicEffect() {
-      isMusicPlaying = true;
-      musicAnimFrame = 0;
+    function startDanceAnimation() {
+      danceContainer.style.display = 'flex'; 
+      danceState = false;
       
-      function musicLoop() {
-        if (!isMusicPlaying) return;
-        musicAnimFrame++;
-
-        // 👇 核心修改：从 10 改成了 40，现在大概 1.5 秒才会切换一次表情，非常舒缓
-        const isHappy = Math.floor(musicAnimFrame / 40) % 2 === 0;
-        const activeFace = (isHappy && imgHappy.complete) ? imgHappy : imgNormal;
-        
-        if (activeFace.complete) {
-          ctx.drawImage(activeFace, 20, 60, 60, 60);
+      danceInterval = setInterval(() => {
+        danceState = !danceState;
+        if (danceState) {
+          danceFace.src = 'player_happy.png'; 
+          danceMusic.style.display = 'inline-block'; 
+        } else {
+          danceFace.src = 'player_normal.png'; 
+          danceMusic.style.display = 'none'; 
         }
-        
-        if (imgMusic.complete) {
-          if (isHappy) {
-            ctx.drawImage(imgMusic, 85, 60, 30, 30);
-          }
-        }
-
-        requestAnimationFrame(musicLoop);
-      }
-      musicLoop();
+      }, 1500); 
     }
 
     playSongBtn.addEventListener('click', () => {
@@ -511,7 +544,7 @@
       loadingHint.style.display = 'block'; 
       
       albumImg.classList.add('playing'); 
-      startMusicEffect(); 
+      startDanceAnimation(); 
       
       medias[currentBest].play().then(() => {
         loadingHint.style.display = 'none';
@@ -537,7 +570,7 @@
       }, 800);
 
       loadingHint.style.display = 'block'; 
-      startMusicEffect(); 
+      startDanceAnimation(); 
       
       medias.Hidden.play().then(() => {
         loadingHint.style.display = 'none'; 
