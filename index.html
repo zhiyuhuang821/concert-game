@@ -130,8 +130,6 @@
 
   <audio id="mediaC" src="songC.mp3" preload="auto"></audio>
   <audio id="mediaFail" src="fail.mp3" preload="auto"></audio>
-  
-  <!-- 👇 修复：改回 audio 标签了，因为 C 是音频 -->
   <audio id="mediaHidden" src="songHidden.mp3" preload="auto"></audio>
 
   <script>
@@ -408,8 +406,8 @@
         endTitle.style.color = '#ffd93d';
         endTitle.style.textShadow = '2px 2px 0 #000';
         
-        let isHidden = (counts.A === counts.B && counts.B === counts.C && counts.C === counts.D && counts.A > 0); 
-        // let isHidden = (counts.A === counts.B && counts.B === counts.C && counts.C === counts.D && counts.A > 0);
+        // 👇 已经改回正常的隐藏判定逻辑了
+        let isHidden = (counts.A === counts.B && counts.B === counts.C && counts.C === counts.D && counts.A > 0);
 
         if (isHidden) {
           endTitle.innerText = 'HIDDEN ENDING?';
@@ -430,16 +428,14 @@
              clickHint.style.display = 'block';
           }
 
-          // 👇 延迟改成 2000 毫秒（2秒）
-          setTimeout(() => {
-            if (currentBest === 'C') {
-              medias.C.play().catch(e => console.log('播放被拦截：', e));
-            } else {
-              videoPlayer.style.display = 'none'; 
-              videoPlayer.src = `song${currentBest}.mp4`;
-              videoPlayer.play().catch(e => console.log('播放被拦截：', e));
-            }
-          }, 2000);
+          // 👇 删除了延迟，立刻触发
+          if (currentBest === 'C') {
+            medias.C.play().catch(e => console.log('播放被拦截：', e));
+          } else {
+            videoPlayer.style.display = 'none'; 
+            videoPlayer.src = `song${currentBest}.mp4`;
+            videoPlayer.play().catch(e => console.log('播放被拦截：', e));
+          }
         }
         
       } else {
@@ -488,17 +484,15 @@
       hiddenFrameIndex = 1;
       hiddenAnim.src = `hidden1.png`;
       
-      // 👇 动画切换速度从 300 毫秒拉长到 800 毫秒（近1秒一帧）
       hiddenAnimInterval = setInterval(() => {
         hiddenFrameIndex++;
         if (hiddenFrameIndex > 4) hiddenFrameIndex = 1;
         hiddenAnim.src = `hidden${hiddenFrameIndex}.png`;
       }, 800);
 
-      // 👇 延迟改成 2000 毫秒（2秒）
-      setTimeout(() => {
-        medias.Hidden.play().catch(e => console.log('播放被拦截：', e));
-      }, 2000); 
+      // 👇 删除了延迟，立刻触发
+      medias.Hidden.play().catch(e => console.log('播放被拦截：', e));
+      
       replayBtn.style.display = 'block';
     });
 
@@ -516,16 +510,15 @@
       if (['A', 'B', 'D'].includes(best)) {
           clickHint.style.display = 'block';
       }
-      // 👇 延迟改成 2000 毫秒（2秒）
-      setTimeout(() => {
-        if (best === 'C') {
-          medias.C.play().catch(e => console.log('播放被拦截：', e));
-        } else {
-          videoPlayer.style.display = 'none';
-          videoPlayer.src = `song${best}.mp4`;
-          videoPlayer.play().catch(e => console.log('播放被拦截：', e));
-        }
-      }, 2000);
+      
+      // 👇 删除了延迟，立刻触发
+      if (best === 'C') {
+        medias.C.play().catch(e => console.log('播放被拦截：', e));
+      } else {
+        videoPlayer.style.display = 'none';
+        videoPlayer.src = `song${best}.mp4`;
+        videoPlayer.play().catch(e => console.log('播放被拦截：', e));
+      }
     });
 
     function startGame() {
