@@ -47,26 +47,27 @@
     }
     .overlay p { font-size: 15px; color: #ccc; line-height: 1.6; margin: 5px 0; }
     
-    /* 👇 调整了小人跳舞的位置和大小 */
+    /* 👇 小人放大，音符保持 */
     .dance-container {
       display: none;
       align-items: center;
       justify-content: flex-start;
-      gap: 5px;
-      height: 36px;
+      gap: 0; 
+      height: 100px;
       position: absolute;
-      top: 15px;
-      left: 15px;
+      top: 10px;
+      left: 10px;
       z-index: 20;
     }
     #dance-face {
-      height: 36px;
+      height: 100px; /* 小人变成 100px */
       image-rendering: pixelated;
     }
     #dance-music {
-      height: 24px;
+      height: 30px; /* 音符依然是 30px */
       image-rendering: pixelated;
       display: none; 
+      margin-left: 2px; 
     }
 
     .media-container {
@@ -145,7 +146,6 @@
 
     <div id="end-screen" class="overlay hidden">
       
-      <!-- 👇 小人跳舞容器，现在绝对在左上角 -->
       <div id="dance-container" class="dance-container">
         <img id="dance-face" src="player_normal.png" alt="face">
         <img id="dance-music" src="music.png" alt="music">
