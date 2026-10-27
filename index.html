@@ -124,10 +124,10 @@
     <button id="skip-btn">SKIP >></button>
   </div>
 
-  <!-- 👇 这里加了 preload="auto"，让页面一打开就开始偷跑下载 -->
-  <audio id="bgmIntro" src="bgm_intro.wav" loop preload="auto"></audio>
+  <!-- 👇 注意这里：intro 和 click 后缀全改成了 mp3 -->
+  <audio id="bgmIntro" src="bgm_intro.mp3" loop preload="auto"></audio>
   <audio id="bgmGame" src="bgm_game.mp3" loop preload="auto"></audio>
-  <audio id="sfxClick" src="sfx_click.wav" preload="auto"></audio>
+  <audio id="sfxClick" src="sfx_click.mp3" preload="auto"></audio>
 
   <audio id="mediaC" src="songC.mp3" preload="auto"></audio>
   <audio id="mediaFail" src="fail.mp3" preload="auto"></audio>
@@ -200,7 +200,7 @@
     let hiddenAnimInterval = null;
     let hiddenFrameIndex = 1;
 
-    // 👇 预加载隐藏的视频
+    // 👇 幕后偷偷加载视频
     const videoCache = {
       A: document.createElement('video'),
       B: document.createElement('video'),
@@ -366,6 +366,7 @@
       update(); draw(); requestAnimationFrame(loop);
     }
 
+    // 👇 改造后的开场动画：拉长了一倍的时间，并加了 Loading 提示
     function playIntro() {
       isPlayingIntro = true; introFrame = 0; introPlayerX = -PLAYER_W; 
       skipBtn.style.display = 'block';
@@ -378,8 +379,9 @@
         introFrame++;
         ctx.fillStyle = '#111116'; ctx.fillRect(0, 0, W, H);
 
-        if (introFrame < 150) {
-          introPlayerX += 3; 
+        // 走路时间翻倍 (原本 150，现在 300)
+        if (introFrame < 300) {
+          introPlayerX += 1.5; // 速度减半
           if (introPlayerX > W / 2 - PLAYER_W / 2) introPlayerX = W / 2 - PLAYER_W / 2; 
         }
 
@@ -388,11 +390,20 @@
         else if (imgNormal.complete) ctx.drawImage(imgNormal, introPlayerX, PLAYER_Y, PLAYER_W, PLAYER_H);
         else { ctx.fillStyle = isHappyFrame ? '#ffd93d' : '#4ecdc4'; ctx.fillRect(introPlayerX, PLAYER_Y, PLAYER_W, PLAYER_H); }
 
-        if (introFrame > 100) {
+        // 文字出现
+        if (introFrame > 200) {
           ctx.fillStyle = '#ffd93d'; ctx.font = 'bold 24px "Courier New", monospace'; ctx.textAlign = 'center';
           if (Math.floor(introFrame / 15) % 2 === 0) ctx.fillText('PIXEL CATCH', W / 2, H / 2 - 60);
         }
-        if (introFrame > 180) { endIntro(); return; }
+
+        // 👇 加入 LOADING 提示
+        if (introFrame > 100) {
+          ctx.fillStyle = '#666'; ctx.font = '12px "Courier New", monospace'; ctx.textAlign = 'center';
+          if (Math.floor(introFrame / 20) % 2 === 0) ctx.fillText('LOADING...', W / 2, H - 80);
+        }
+
+        // 动画总时长翻倍 (原本 180，现在 360，大约 6 秒)
+        if (introFrame > 360) { endIntro(); return; }
         requestAnimationFrame(introLoop);
       }
       introLoop();
@@ -438,12 +449,10 @@
              clickHint.style.display = 'block';
           }
 
-          // 👇 无延迟播放，利用后台已经预加载的缓存
           if (currentBest === 'C') {
             medias.C.play().catch(e => console.log('播放被拦截：', e));
           } else {
             videoPlayer.style.display = 'none'; 
-            // 使用 prepopulated 的缓存视频源，加快播放速度
             videoPlayer.src = videoCache[currentBest].src; 
             videoPlayer.play().catch(e => console.log('播放被拦截：', e));
           }
