@@ -49,23 +49,7 @@
       border: 4px solid #4ecdc4; border-radius: 8px;
       object-fit: cover; box-shadow: 0 0 20px rgba(78, 205, 196, 0.4);
       display: none; background: #222;
-      cursor: pointer;
     }
-
-    #video-player {
-      width: 100%; height: 100%;
-      border: 4px solid #4ecdc4; border-radius: 8px;
-      object-fit: cover; box-shadow: 0 0 20px rgba(78, 205, 196, 0.4);
-      display: none; background: #000;
-      outline: none;
-    }
-
-    #click-hint {
-      color: #ffd93d; font-size: 13px; font-weight: bold;
-      display: none; animation: blink 1.2s infinite;
-      cursor: pointer; margin-top: -10px;
-    }
-    @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
 
     #fail-anim, #hidden-anim {
       width: 100%; height: 100%;
@@ -102,14 +86,10 @@
     <div id="end-screen" class="overlay hidden">
       <div class="media-container">
         <img id="album-img" src="" alt="Album Cover" onerror="this.style.display='none'">
-        <video id="video-player" playsinline controls style="display:none;"></video>
-        
         <img id="fail-anim" src="player_normal.png" alt="Fail Animation">
         <img id="hidden-anim" src="hidden1.png" alt="Hidden Animation">
       </div>
       
-      <p id="click-hint">Click to watch the video ▶</p>
-
       <h1 id="end-title">CLEAR!</h1>
       <p id="end-desc">即将播放...</p>
       
@@ -124,12 +104,18 @@
     <button id="skip-btn">SKIP >></button>
   </div>
 
-  <!-- 👇 注意这里：intro 和 click 后缀全改成了 mp3 -->
+  <!-- 背景音乐 -->
   <audio id="bgmIntro" src="bgm_intro.mp3" loop preload="auto"></audio>
   <audio id="bgmGame" src="bgm_game.mp3" loop preload="auto"></audio>
   <audio id="sfxClick" src="sfx_click.mp3" preload="auto"></audio>
 
-  <audio id="mediaC" src="songC.mp3" preload="auto"></audio>
+  <!-- 你已经传好的图床直链 -->
+  <audio id="mediaA" src="https://img2.tofaka.com/autoupload/fr/RjuSsJ9JQoUpZL0vII50cXZYE_SgiGgbUM4XMNu-bqCyl5f0KlZfm6UsKj-HyTuv/20261027/RLMp/songA.mp3" preload="auto"></audio>
+  <audio id="mediaB" src="https://img2.tofaka.com/autoupload/fr/RjuSsJ9JQoUpZL0vII50cXZYE_SgiGgbUM4XMNu-bqCyl5f0KlZfm6UsKj-HyTuv/20261027/AofP/songB.mp3" preload="auto"></audio>
+  <audio id="mediaC" src="https://img2.tofaka.com/autoupload/fr/RjuSsJ9JQoUpZL0vII50cXZYE_SgiGgbUM4XMNu-bqCyl5f0KlZfm6UsKj-HyTuv/20261027/Aem4/songC.mp3" preload="auto"></audio>
+  <audio id="mediaD" src="https://img2.tofaka.com/autoupload/fr/RjuSsJ9JQoUpZL0vII50cXZYE_SgiGgbUM4XMNu-bqCyl5f0KlZfm6UsKj-HyTuv/20261027/C1Fm/songD.mp3" preload="auto"></audio>
+  
+  <!-- 如果你也把失败和隐藏音频传了图床，记得替换下面两个链接 -->
   <audio id="mediaFail" src="fail.mp3" preload="auto"></audio>
   <audio id="mediaHidden" src="songHidden.mp3" preload="auto"></audio>
 
@@ -169,8 +155,6 @@
     const endTitle = document.getElementById('end-title');
     const endDesc = document.getElementById('end-desc');
     const albumImg = document.getElementById('album-img');
-    const videoPlayer = document.getElementById('video-player');
-    const clickHint = document.getElementById('click-hint');
     
     const failAnim = document.getElementById('fail-anim'); 
     const hiddenAnim = document.getElementById('hidden-anim');
@@ -181,7 +165,12 @@
     const skipHiddenBtn = document.getElementById('skip-hidden-btn');
     
     const medias = {
-      C: document.getElementById('mediaC'), Fail: document.getElementById('mediaFail'), Hidden: document.getElementById('mediaHidden')
+      A: document.getElementById('mediaA'),
+      B: document.getElementById('mediaB'),
+      C: document.getElementById('mediaC'),
+      D: document.getElementById('mediaD'),
+      Fail: document.getElementById('mediaFail'), 
+      Hidden: document.getElementById('mediaHidden')
     };
 
     const bgmIntro = document.getElementById('bgmIntro');
@@ -200,16 +189,6 @@
     let hiddenAnimInterval = null;
     let hiddenFrameIndex = 1;
 
-    // 👇 幕后偷偷加载视频
-    const videoCache = {
-      A: document.createElement('video'),
-      B: document.createElement('video'),
-      D: document.createElement('video')
-    };
-    videoCache.A.src = 'songA.mp4'; videoCache.A.preload = 'auto'; videoCache.A.muted = true;
-    videoCache.B.src = 'songB.mp4'; videoCache.B.preload = 'auto'; videoCache.B.muted = true;
-    videoCache.D.src = 'songD.mp4'; videoCache.D.preload = 'auto'; videoCache.D.muted = true;
-
     function playClick() {
       sfxClick.currentTime = 0; 
       sfxClick.volume = 0.6;
@@ -226,19 +205,12 @@
       if (hiddenAnimInterval) clearInterval(hiddenAnimInterval);
       
       albumImg.style.display = 'none';
-      videoPlayer.style.display = 'none';
-      videoPlayer.pause();
-      videoPlayer.currentTime = 0;
-      
-      clickHint.style.display = 'none';
       failAnim.style.display = 'none';
       hiddenAnim.style.display = 'none';
       replayBtn.style.display = 'none';
       hiddenPrompt.style.display = 'none';
       
-      medias.C.pause(); medias.C.currentTime = 0;
-      medias.Fail.pause(); medias.Fail.currentTime = 0;
-      medias.Hidden.pause(); medias.Hidden.currentTime = 0;
+      Object.values(medias).forEach(m => { m.pause(); m.currentTime = 0; });
       bgmGame.pause(); bgmGame.currentTime = 0;
     }
 
@@ -366,7 +338,6 @@
       update(); draw(); requestAnimationFrame(loop);
     }
 
-    // 👇 改造后的开场动画：拉长了一倍的时间，并加了 Loading 提示
     function playIntro() {
       isPlayingIntro = true; introFrame = 0; introPlayerX = -PLAYER_W; 
       skipBtn.style.display = 'block';
@@ -379,9 +350,8 @@
         introFrame++;
         ctx.fillStyle = '#111116'; ctx.fillRect(0, 0, W, H);
 
-        // 走路时间翻倍 (原本 150，现在 300)
         if (introFrame < 300) {
-          introPlayerX += 1.5; // 速度减半
+          introPlayerX += 1.5; 
           if (introPlayerX > W / 2 - PLAYER_W / 2) introPlayerX = W / 2 - PLAYER_W / 2; 
         }
 
@@ -390,19 +360,16 @@
         else if (imgNormal.complete) ctx.drawImage(imgNormal, introPlayerX, PLAYER_Y, PLAYER_W, PLAYER_H);
         else { ctx.fillStyle = isHappyFrame ? '#ffd93d' : '#4ecdc4'; ctx.fillRect(introPlayerX, PLAYER_Y, PLAYER_W, PLAYER_H); }
 
-        // 文字出现
         if (introFrame > 200) {
           ctx.fillStyle = '#ffd93d'; ctx.font = 'bold 24px "Courier New", monospace'; ctx.textAlign = 'center';
           if (Math.floor(introFrame / 15) % 2 === 0) ctx.fillText('PIXEL CATCH', W / 2, H / 2 - 60);
         }
 
-        // 👇 加入 LOADING 提示
         if (introFrame > 100) {
           ctx.fillStyle = '#666'; ctx.font = '12px "Courier New", monospace'; ctx.textAlign = 'center';
           if (Math.floor(introFrame / 20) % 2 === 0) ctx.fillText('LOADING...', W / 2, H - 80);
         }
 
-        // 动画总时长翻倍 (原本 180，现在 360，大约 6 秒)
         if (introFrame > 360) { endIntro(); return; }
         requestAnimationFrame(introLoop);
       }
@@ -442,20 +409,10 @@
           
           albumImg.style.display = 'block';
           albumImg.src = `album${currentBest}.jpg`; 
-          endDesc.innerText = `接住最多的是 ${ITEM_NAMES[currentBest]}\n即将播放对应歌曲...`;
+          endDesc.innerText = `接住最多的是 ${ITEM_NAMES[currentBest]}\n正在播放歌曲...`;
           replayBtn.style.display = 'block';
           
-          if (['A', 'B', 'D'].includes(currentBest)) {
-             clickHint.style.display = 'block';
-          }
-
-          if (currentBest === 'C') {
-            medias.C.play().catch(e => console.log('播放被拦截：', e));
-          } else {
-            videoPlayer.style.display = 'none'; 
-            videoPlayer.src = videoCache[currentBest].src; 
-            videoPlayer.play().catch(e => console.log('播放被拦截：', e));
-          }
+          medias[currentBest].play().catch(e => console.log('播放被拦截：', e));
         }
         
       } else {
@@ -465,7 +422,6 @@
         endDesc.innerText = `你接了太多炸弹！\n被炸晕了...`;
         
         albumImg.style.display = 'none';
-        clickHint.style.display = 'none'; 
         failAnim.style.display = 'block';
         replayBtn.style.display = 'block';
         
@@ -477,23 +433,6 @@
         medias.Fail.play().catch(e => console.log('播放被拦截：', e));
       }
     }
-
-    function playVideo() {
-      playClick();
-      if (['A', 'B', 'D'].includes(currentBest)) {
-        const currentTime = videoPlayer.currentTime;
-        
-        albumImg.style.display = 'none';
-        clickHint.style.display = 'none';
-        videoPlayer.style.display = 'block';
-        
-        videoPlayer.currentTime = currentTime;
-        videoPlayer.play().catch(e => console.log('视频播放被拦截：', e));
-      }
-    }
-
-    albumImg.addEventListener('click', playVideo);
-    clickHint.addEventListener('click', playVideo);
 
     unlockHiddenBtn.addEventListener('click', () => {
       playClick();
@@ -522,20 +461,10 @@
       
       albumImg.style.display = 'block';
       albumImg.src = `album${best}.jpg`; 
-      endDesc.innerText = `接住最多的是 ${ITEM_NAMES[best]}\n即将播放对应歌曲...`;
+      endDesc.innerText = `接住最多的是 ${ITEM_NAMES[best]}\n正在播放歌曲...`;
       replayBtn.style.display = 'block';
       
-      if (['A', 'B', 'D'].includes(best)) {
-          clickHint.style.display = 'block';
-      }
-      
-      if (best === 'C') {
-        medias.C.play().catch(e => console.log('播放被拦截：', e));
-      } else {
-        videoPlayer.style.display = 'none';
-        videoPlayer.src = videoCache[best].src;
-        videoPlayer.play().catch(e => console.log('播放被拦截：', e));
-      }
+      medias[best].play().catch(e => console.log('播放被拦截：', e));
     });
 
     function startGame() {
