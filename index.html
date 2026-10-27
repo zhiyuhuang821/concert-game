@@ -124,9 +124,10 @@
     <button id="skip-btn">SKIP >></button>
   </div>
 
-  <audio id="bgmIntro" src="bgm_intro.wav" loop></audio>
-  <audio id="bgmGame" src="bgm_game.mp3" loop></audio>
-  <audio id="sfxClick" src="sfx_click.wav"></audio>
+  <!-- 👇 这里加了 preload="auto"，让页面一打开就开始偷跑下载 -->
+  <audio id="bgmIntro" src="bgm_intro.wav" loop preload="auto"></audio>
+  <audio id="bgmGame" src="bgm_game.mp3" loop preload="auto"></audio>
+  <audio id="sfxClick" src="sfx_click.wav" preload="auto"></audio>
 
   <audio id="mediaC" src="songC.mp3" preload="auto"></audio>
   <audio id="mediaFail" src="fail.mp3" preload="auto"></audio>
@@ -198,6 +199,16 @@
     let failAnimInterval = null;
     let hiddenAnimInterval = null;
     let hiddenFrameIndex = 1;
+
+    // 👇 预加载隐藏的视频
+    const videoCache = {
+      A: document.createElement('video'),
+      B: document.createElement('video'),
+      D: document.createElement('video')
+    };
+    videoCache.A.src = 'songA.mp4'; videoCache.A.preload = 'auto'; videoCache.A.muted = true;
+    videoCache.B.src = 'songB.mp4'; videoCache.B.preload = 'auto'; videoCache.B.muted = true;
+    videoCache.D.src = 'songD.mp4'; videoCache.D.preload = 'auto'; videoCache.D.muted = true;
 
     function playClick() {
       sfxClick.currentTime = 0; 
@@ -406,7 +417,6 @@
         endTitle.style.color = '#ffd93d';
         endTitle.style.textShadow = '2px 2px 0 #000';
         
-        // 👇 已经改回正常的隐藏判定逻辑了
         let isHidden = (counts.A === counts.B && counts.B === counts.C && counts.C === counts.D && counts.A > 0);
 
         if (isHidden) {
@@ -428,12 +438,13 @@
              clickHint.style.display = 'block';
           }
 
-          // 👇 删除了延迟，立刻触发
+          // 👇 无延迟播放，利用后台已经预加载的缓存
           if (currentBest === 'C') {
             medias.C.play().catch(e => console.log('播放被拦截：', e));
           } else {
             videoPlayer.style.display = 'none'; 
-            videoPlayer.src = `song${currentBest}.mp4`;
+            // 使用 prepopulated 的缓存视频源，加快播放速度
+            videoPlayer.src = videoCache[currentBest].src; 
             videoPlayer.play().catch(e => console.log('播放被拦截：', e));
           }
         }
@@ -490,9 +501,7 @@
         hiddenAnim.src = `hidden${hiddenFrameIndex}.png`;
       }, 800);
 
-      // 👇 删除了延迟，立刻触发
       medias.Hidden.play().catch(e => console.log('播放被拦截：', e));
-      
       replayBtn.style.display = 'block';
     });
 
@@ -511,12 +520,11 @@
           clickHint.style.display = 'block';
       }
       
-      // 👇 删除了延迟，立刻触发
       if (best === 'C') {
         medias.C.play().catch(e => console.log('播放被拦截：', e));
       } else {
         videoPlayer.style.display = 'none';
-        videoPlayer.src = `song${best}.mp4`;
+        videoPlayer.src = videoCache[best].src;
         videoPlayer.play().catch(e => console.log('播放被拦截：', e));
       }
     });
