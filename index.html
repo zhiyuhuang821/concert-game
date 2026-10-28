@@ -101,56 +101,40 @@ canvas{width:100%;height:100%;display:block;image-rendering:pixelated;touch-acti
 const bgLayer=document.getElementById('bg-layer'),charLayer=document.getElementById('char-layer'),charImg=document.getElementById('char-img'),dialogText=document.getElementById('dialog-text'),choicesContainer=document.getElementById('choices-container'),fxContainer=document.getElementById('fx-container'),showcaseItem=document.getElementById('showcase-item'),musicEaster=document.getElementById('music-easter'),titleScreen=document.getElementById('title-screen'),endScreen=document.getElementById('end-screen'),flashbang=document.getElementById('flashbang'),gameWrap=document.getElementById('game-wrap'),vortex=document.getElementById('vortex-overlay'),dialogBox=document.getElementById('dialog-box'),clearOverlay=document.getElementById('clear-overlay');
 let weights={songA:0,songB:0,songC:0,songD:0,bonus:0,hidden:0},typingTimer=null,isTyping=false,currentFullText='',dialogQueue=[],onDialogComplete=null;
 let memTimeouts=[];
+let isWelcomeShown = false; // 👈 新增：防止“欢迎大家”重复触发的状态锁
 
 function playClick(){const s=document.getElementById('sfxClick');s.currentTime=0;s.volume=.6;s.play().catch(()=>{})}
 function clearMemTimeouts(){memTimeouts.forEach(t=>clearTimeout(t));memTimeouts=[];}
 
-// 对话框点击核心逻辑
-function bindDialogClick(action){
+// 返璞归真的弹窗机制
+function showDialog(t,c){
+  clearMemTimeouts();
+  dialogQueue=[...t];
+  onDialogComplete=c;
+  choicesContainer.style.display='none';
+  choicesContainer.innerHTML='';
+  
+  isTyping = false;
+  clearInterval(typingTimer);
+  
+  // 清理旧事件，绑新事件
   dialogBox.onclick = null;
-  dialogBox.onclick = (e)=>{
-    e.stopPropagation();
+  dialogBox.onclick = () => {
     playClick();
-    
-    // 正在打字，点一下全出
     if(isTyping){
       clearInterval(typingTimer);
       dialogText.innerText=currentFullText;
       isTyping=false;
       return;
     }
-    
-    // 字已经出全，执行下一步
-    action();
+    if(dialogQueue.length>0){
+      nextDialogLine();
+    } else if(onDialogComplete) {
+      onDialogComplete();
+    }
   };
-}
-
-// 统一的弹出对话函数
-function showDialog(t,c){
-  clearMemTimeouts();
-  isTyping = false;
-  clearInterval(typingTimer);
   
-  // 隐藏对话框，制造0.2秒的“物理空虚期”防双击
-  dialogBox.style.display = 'none';
-  
-  setTimeout(()=>{
-    dialogBox.style.display = 'flex';
-    dialogQueue=[...t];
-    onDialogComplete=c;
-    choicesContainer.style.display='none';
-    choicesContainer.innerHTML='';
-    
-    bindDialogClick(()=>{
-      if(dialogQueue.length>0){
-        nextDialogLine();
-      } else if(onDialogComplete) {
-        onDialogComplete();
-      }
-    });
-    
-    nextDialogLine();
-  }, 200); // 这个 200ms 的时间内，鼠标点不到任何东西
+  nextDialogLine();
 }
 
 function nextDialogLine(){
@@ -172,33 +156,21 @@ function nextDialogLine(){
   },100)
 }
 
-// 选项界面防双击
 function showChoices(c){
-  dialogBox.onclick = null; 
-  dialogBox.style.display = 'none'; // 直接藏起来
-  
-  choicesContainer.style.display='flex';
-  choicesContainer.innerHTML='';
-  choicesContainer.style.pointerEvents = 'none'; 
-  
-  setTimeout(()=>{
-    choicesContainer.style.pointerEvents = 'auto'; 
-    c.forEach(o=>{
-      let b=document.createElement('button');
-      b.className='choice-btn';b.innerText=o.label;
-      b.onclick=(e)=>{
-        e.stopPropagation(); 
-        b.style.pointerEvents='none'; 
-        playClick();
-        
-        choicesContainer.style.display='none';
-        choicesContainer.innerHTML=''; 
-        
-        o.callback(); 
-      };
-      choicesContainer.appendChild(b);
-    });
-  }, 300); // 0.3秒后选项才能点
+  choicesContainer.style.display='flex';choicesContainer.innerHTML='';
+  c.forEach(o=>{
+    let b=document.createElement('button');
+    b.className='choice-btn';b.innerText=o.label;
+    b.onclick=(e)=>{
+      e.stopPropagation(); 
+      b.style.pointerEvents='none'; 
+      playClick();
+      choicesContainer.style.display='none';
+      choicesContainer.innerHTML=''; 
+      o.callback(); 
+    };
+    choicesContainer.appendChild(b);
+  });
 }
 
 function spawnLightsticks(){fxContainer.innerHTML='';for(let i=0;i<25;i++){let l=document.createElement('img');l.className='lightstick';l.src=Math.random()>.5?'light1.png':'light2.png';l.style.display='block';l.style.left=(10+Math.random()*330)+'px';l.style.top=(50+Math.random()*400)+'px';l.style.animationDelay=(Math.random()*1)+'s';fxContainer.appendChild(l)}}
@@ -250,8 +222,12 @@ function triggerCharacterWalkOut(){
     }
     
     charImg.src='player_happy.png';
-    // 弹出欢迎大家
-    showDialog(["江山：欢迎大家来到我的演唱会，我是歌手谷江山。"],showChoice1);
+    
+    // 👇 核心修复：用状态锁，保证“欢迎大家”绝对只弹一次
+    if(!isWelcomeShown) {
+      isWelcomeShown = true;
+      showDialog(["江山：欢迎大家来到我的演唱会，我是歌手江山。"],showChoice1);
+    }
     
   },2500);
 }
@@ -343,10 +319,6 @@ function showcaseItemsSequentially(callback){
     showcaseItem.style.display='none';
     dialogText.innerText='';
     playClick();
-    bindDialogClick(()=>{
-        if(dialogQueue.length>0)nextDialogLine();
-        else if(onDialogComplete)onDialogComplete();
-    });
     showDialog(["（这是......）","（回忆......?）"],callback);
   };
 }
@@ -378,10 +350,12 @@ function nextA1(){
   typingTimer=setInterval(()=>{if(j<currentFullText.length){dialogText.innerText+=currentFullText.charAt(j);j++}else{clearInterval(typingTimer);isTyping=false}},100)
 }
 nextA1();
-bindDialogClick(()=>{
+dialogBox.onclick = () => {
+  playClick();
+  if(isTyping){clearInterval(typingTimer);dialogText.innerText=currentFullText;isTyping=false;return}
   if(dialogQueue.length>0)nextA1();
   else if(onDialogComplete)onDialogComplete();
-});
+};
 }
 
 function subB1(){showDialog(["（想起来还有点想笑，那时候我们都年纪很小呢。）","（那时候的大家都想象不到未来会是什么样子，也许还会躲起来偷偷流泪。）","（......但是如今，我们都站在这里。）"],returnToMain2)}
@@ -470,6 +444,7 @@ initGameEngine();running=true;drawGame();loopGame();
 }
 
 function endGameEngine(isWin){
+  document.getElementById('game-layer').style.pointerEvents = 'none';
   running=false;
   document.getElementById('bgmGame').pause();
   document.getElementById('game-layer').style.display='none';
