@@ -72,6 +72,7 @@ canvas{width:100%;height:100%;display:block;image-rendering:pixelated;touch-acti
 <div id="choices-container"></div>
 <div id="game-layer"><canvas id="game" width="360" height="640"></canvas></div>
 <div id="clear-overlay"><h1>CLEAR!</h1></div>
+<img id="hidden-img" src="hidden1.png" alt="hidden" style="display:none; position:absolute; top:40%; left:50%; transform:translate(-50%,-50%); width:200px; z-index:45; image-rendering:pixelated; border:4px solid #b388ff; border-radius:8px;">
 
 <div id="end-screen">
 <div id="dance-container">
@@ -100,86 +101,121 @@ canvas{width:100%;height:100%;display:block;image-rendering:pixelated;touch-acti
 const bgLayer=document.getElementById('bg-layer'),charLayer=document.getElementById('char-layer'),charImg=document.getElementById('char-img'),dialogText=document.getElementById('dialog-text'),choicesContainer=document.getElementById('choices-container'),fxContainer=document.getElementById('fx-container'),showcaseItem=document.getElementById('showcase-item'),musicEaster=document.getElementById('music-easter'),titleScreen=document.getElementById('title-screen'),endScreen=document.getElementById('end-screen'),flashbang=document.getElementById('flashbang'),gameWrap=document.getElementById('game-wrap'),vortex=document.getElementById('vortex-overlay'),dialogBox=document.getElementById('dialog-box'),clearOverlay=document.getElementById('clear-overlay');
 let weights={songA:0,songB:0,songC:0,songD:0,bonus:0,hidden:0},typingTimer=null,isTyping=false,currentFullText='',dialogQueue=[],onDialogComplete=null;
 let memTimeouts=[];
-let isCallingPlaying = false;
-let lockClick = false;
 
 function playClick(){const s=document.getElementById('sfxClick');s.currentTime=0;s.volume=.6;s.play().catch(()=>{})}
 function clearMemTimeouts(){memTimeouts.forEach(t=>clearTimeout(t));memTimeouts=[];}
 
+// 对话框点击核心逻辑
 function bindDialogClick(action){
   dialogBox.onclick = null;
   dialogBox.onclick = (e)=>{
     e.stopPropagation();
-    if(lockClick) return;
     playClick();
+    
+    // 正在打字，点一下全出
+    if(isTyping){
+      clearInterval(typingTimer);
+      dialogText.innerText=currentFullText;
+      isTyping=false;
+      return;
+    }
+    
+    // 字已经出全，执行下一步
     action();
   };
 }
 
+// 统一的弹出对话函数
 function showDialog(t,c){
   clearMemTimeouts();
-  lockClick = false;
-  dialogQueue=[...t];onDialogComplete=c;choicesContainer.style.display='none';choicesContainer.innerHTML='';
-  dialogBox.style.pointerEvents='auto'; 
-  nextDialogLine();
+  isTyping = false;
+  clearInterval(typingTimer);
+  
+  // 隐藏对话框，制造0.2秒的“物理空虚期”防双击
+  dialogBox.style.display = 'none';
+  
+  setTimeout(()=>{
+    dialogBox.style.display = 'flex';
+    dialogQueue=[...t];
+    onDialogComplete=c;
+    choicesContainer.style.display='none';
+    choicesContainer.innerHTML='';
+    
+    bindDialogClick(()=>{
+      if(dialogQueue.length>0){
+        nextDialogLine();
+      } else if(onDialogComplete) {
+        onDialogComplete();
+      }
+    });
+    
+    nextDialogLine();
+  }, 200); // 这个 200ms 的时间内，鼠标点不到任何东西
 }
 
 function nextDialogLine(){
   if(dialogQueue.length===0){if(onDialogComplete)onDialogComplete();return}
-  currentFullText=dialogQueue.shift();dialogText.innerText='';isTyping=true;
-  let i=0;clearInterval(typingTimer);
-  typingTimer=setInterval(()=>{if(i<currentFullText.length){dialogText.innerText+=currentFullText.charAt(i);i++}else{clearInterval(typingTimer);isTyping=false}},100)
+  currentFullText=dialogQueue.shift();
+  dialogText.innerText='';
+  isTyping=true;
+  
+  let i=0;
+  clearInterval(typingTimer);
+  typingTimer=setInterval(()=>{
+    if(i<currentFullText.length){
+      dialogText.innerText+=currentFullText.charAt(i);
+      i++;
+    }else{
+      clearInterval(typingTimer);
+      isTyping=false;
+    }
+  },100)
 }
 
-bindDialogClick(()=>{
-  if (isCallingPlaying) {
-    isCallingPlaying = false;
-    const callAudio = document.getElementById('bgmCalling');
-    callAudio.pause();
-    triggerCharacterWalkOut(); 
-    return;
-  }
-  
-  if(isTyping){clearInterval(typingTimer);dialogText.innerText=currentFullText;isTyping=false}
-  else if(dialogQueue.length>0)nextDialogLine();
-  else if(onDialogComplete)onDialogComplete();
-});
-
+// 选项界面防双击
 function showChoices(c){
-  choicesContainer.style.display='flex';choicesContainer.innerHTML='';
-  c.forEach(o=>{
-    let b=document.createElement('button');
-    b.className='choice-btn';b.innerText=o.label;
-    b.onclick=(e)=>{
-      e.stopPropagation(); 
-      b.style.pointerEvents='none'; 
-      playClick();
-      choicesContainer.style.display='none';
-      choicesContainer.innerHTML=''; 
-      o.callback(); 
-    };
-    choicesContainer.appendChild(b);
-  });
+  dialogBox.onclick = null; 
+  dialogBox.style.display = 'none'; // 直接藏起来
+  
+  choicesContainer.style.display='flex';
+  choicesContainer.innerHTML='';
+  choicesContainer.style.pointerEvents = 'none'; 
+  
+  setTimeout(()=>{
+    choicesContainer.style.pointerEvents = 'auto'; 
+    c.forEach(o=>{
+      let b=document.createElement('button');
+      b.className='choice-btn';b.innerText=o.label;
+      b.onclick=(e)=>{
+        e.stopPropagation(); 
+        b.style.pointerEvents='none'; 
+        playClick();
+        
+        choicesContainer.style.display='none';
+        choicesContainer.innerHTML=''; 
+        
+        o.callback(); 
+      };
+      choicesContainer.appendChild(b);
+    });
+  }, 300); // 0.3秒后选项才能点
 }
 
 function spawnLightsticks(){fxContainer.innerHTML='';for(let i=0;i<25;i++){let l=document.createElement('img');l.className='lightstick';l.src=Math.random()>.5?'light1.png':'light2.png';l.style.display='block';l.style.left=(10+Math.random()*330)+'px';l.style.top=(50+Math.random()*400)+'px';l.style.animationDelay=(Math.random()*1)+'s';fxContainer.appendChild(l)}}
 
-// 👇 核心修复：用 Web Audio API 强制“污染”音频权限，骗过手机浏览器
 titleScreen.onclick=()=>{
   playClick();
   titleScreen.style.display='none';
-
-  const AudioContext = window.AudioContext || window.webkitAudioContext;
-  if (AudioContext) {
-    const ctx = new AudioContext();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    gain.gain.value = 0; // 完全静音
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(0);
-    osc.stop(0.1); // 极短促地跑一下，激活浏览器的音频权限
-  }
+  
+  ['bgmCalling','bgmCheering','sfxClick'].forEach(id => {
+    let a = document.getElementById(id);
+    a.volume = 0;
+    a.play().then(() => {
+      a.pause();
+      a.currentTime = 0;
+      a.volume = 1;
+    }).catch(()=>{});
+  });
 
   startStory();
 };
@@ -190,34 +226,33 @@ showDialog(["江山：请保持良好秩序，请勿拥挤、推搡，安全第�
   const callAudio=document.getElementById('bgmCalling');
   callAudio.currentTime=0;
   callAudio.play().catch(()=>{});
-  isCallingPlaying = true; 
   
   setTimeout(()=>{
-    if(isCallingPlaying) {
-      isCallingPlaying = false;
-      triggerCharacterWalkOut();
-    }
+    triggerCharacterWalkOut();
   }, 6000); 
 });
 }
 
 function triggerCharacterWalkOut(){
   const callAudio=document.getElementById('bgmCalling');
-  callAudio.onended = null; 
-  callAudio.pause(); 
+  if(callAudio) callAudio.pause(); 
   
   charLayer.style.display='flex';charImg.src='player_normal.png';charImg.style.display='block';charLayer.style.transform='translateX(-50%) translateY(200px)';
   setTimeout(()=>{charLayer.style.transform='translateX(-50%) translateY(0)'},50);
   
   setTimeout(()=>{
     const cheer=document.getElementById('bgmCheering');
-    cheer.pause();
-    cheer.currentTime=0;
-    cheer.volume = 1;
-    cheer.play().catch(()=>{});
+    if(cheer) {
+      cheer.pause();
+      cheer.currentTime=0;
+      cheer.volume = 1;
+      cheer.play().catch(()=>{});
+    }
     
     charImg.src='player_happy.png';
-    showDialog(["江山：欢迎大家来到我的演唱会，我是歌手江山。"],showChoice1)
+    // 弹出欢迎大家
+    showDialog(["江山：欢迎大家来到我的演唱会，我是歌手谷江山。"],showChoice1);
+    
   },2500);
 }
 
@@ -225,11 +260,12 @@ function showChoice1(){showChoices([
 {label:"A. 大声欢呼",callback:()=>{
   weights.songB+=1;
   const cheer=document.getElementById('bgmCheering');
-  cheer.pause(); 
-  cheer.currentTime=0; 
-  cheer.volume = 1;
-  setTimeout(()=>{cheer.play().catch(()=>{})}, 50); 
-  
+  if(cheer) {
+    cheer.pause(); 
+    cheer.currentTime=0; 
+    cheer.volume = 1;
+    setTimeout(()=>{cheer.play().catch(()=>{})}, 50); 
+  }
   sceneNext1();
 }},
 {label:"B. 摇晃应援棒",callback:()=>{spawnLightsticks();sceneNext1()}},
@@ -278,11 +314,6 @@ function showcaseItemsSequentially(callback){
   function showNext(){
     if(idx>=items.length){
       dialogBox.style.pointerEvents='auto';
-      bindDialogClick(()=>{
-        if(isTyping){clearInterval(typingTimer);dialogText.innerText=currentFullText;isTyping=false}
-        else if(dialogQueue.length>0)nextDialogLine();
-        else if(onDialogComplete)onDialogComplete();
-      });
       showDialog(["（这是......）","（回忆......?）"],callback);
       return;
     }
@@ -313,8 +344,7 @@ function showcaseItemsSequentially(callback){
     dialogText.innerText='';
     playClick();
     bindDialogClick(()=>{
-        if(isTyping){clearInterval(typingTimer);dialogText.innerText=currentFullText;isTyping=false}
-        else if(dialogQueue.length>0)nextDialogLine();
+        if(dialogQueue.length>0)nextDialogLine();
         else if(onDialogComplete)onDialogComplete();
     });
     showDialog(["（这是......）","（回忆......?）"],callback);
@@ -349,14 +379,13 @@ function nextA1(){
 }
 nextA1();
 bindDialogClick(()=>{
-  if(isTyping){clearInterval(typingTimer);dialogText.innerText=currentFullText;isTyping=false}
-  else if(dialogQueue.length>0)nextA1();
+  if(dialogQueue.length>0)nextA1();
   else if(onDialogComplete)onDialogComplete();
 });
 }
 
 function subB1(){showDialog(["（想起来还有点想笑，那时候我们都年纪很小呢。）","（那时候的大家都想象不到未来会是什么样子，也许还会躲起来偷偷流泪。）","（......但是如今，我们都站在这里。）"],returnToMain2)}
-function returnToMain2(){if(weights.hidden>=3){triggerHiddenScene(glitchScene)}else{glitchScene()}}
+function returnToMain2(){glitchScene()}
 
 function glitchScene(){
 bgLayer.classList.add('glitch');
@@ -405,8 +434,6 @@ setTimeout(()=>{
 }, 300);
 }
 
-function triggerHiddenScene(callback){callback()}
-
 const canvas=document.getElementById('game'),ctx=canvas.getContext('2d'),W=canvas.width,H=canvas.height;ctx.imageSmoothingEnabled=false;
 const PLAYER_W=176,PLAYER_H=176,PLAYER_Y=H-170,PLAYER_EDGE_PADDING=40,ITEM_SIZE=64,SPAWN_INTERVAL=80,BASE_SPEED=1.2,TARGET_SCORE=20,MAX_FAILS=5;
 const imgBg=new Image();imgBg.src='bg.png';const BIRD_W=144,BIRD_H=96;const imgBirdLeft=new Image();imgBirdLeft.src='bird_left.png';const imgBirdRight=new Image();imgBirdRight.src='bird_right.png';const imgNormal=new Image();imgNormal.src='player_normal.png';const imgHappy=new Image();imgHappy.src='player_happy.png';const imgHurt=new Image();imgHurt.src='player_hurt.png';
@@ -448,7 +475,6 @@ function endGameEngine(isWin){
   document.getElementById('game-layer').style.display='none';
   document.getElementById('dialog-box').style.display='flex';
   document.getElementById('dialog-box').style.opacity = '0';
-  lockClick = true;
 
   if(!isWin){
     const fo=document.getElementById('fail-overlay');
@@ -459,7 +485,6 @@ function endGameEngine(isWin){
       clearInterval(failAnimInterval);fo.style.display='none';startGame();
     });
     document.getElementById('dialog-box').style.opacity = '1';
-    lockClick = false;
     return;
   }
 
@@ -488,17 +513,41 @@ function endGameEngine(isWin){
         }, 50);
 
         setTimeout(()=>{
-          lockClick = false; 
           charImg.src='player_happy.png';
-          showDialog(["江山：谢谢大家。","江山：没有大家，就没有今天的我。","（没有你，也不会有此刻的我们......）"],()=>{
-            showDialog(["江山：接下来，请尽情享受属于你的歌曲吧！"],showFinalEndScreen);
+          
+          showDialog(["江山：谢谢大家。","江山：没有大家，就没有今天的我。","（没有你，也不会有此刻的我们......）"], ()=>{
+            if(weights.hidden >= 2){
+               triggerHiddenScene(showFinalEndScreen);
+            } else {
+               showDialog(["江山：接下来，请尽情享受属于你的歌曲吧！"], showFinalEndScreen);
+            }
           });
+          
           document.getElementById('dialog-box').style.opacity = '1'; 
         }, 2000);
       }, 1500); 
-
     }, 1000); 
   }, 2500); 
+}
+
+function triggerHiddenScene(callback){
+  charLayer.style.display = 'none'; 
+  dialogBox.style.pointerEvents = 'none';
+  
+  const hiddenImg = document.getElementById('hidden-img');
+  hiddenImg.style.display = 'block';
+  let frame = 1;
+  let animInt = setInterval(()=>{
+    frame++; if(frame > 4) frame = 1;
+    hiddenImg.src = `hidden${frame}.png`;
+  }, 2000);
+
+  setTimeout(()=>{
+    clearInterval(animInt);
+    hiddenImg.style.display = 'none';
+    dialogBox.style.pointerEvents = 'auto';
+    showDialog(["江山：接下来，请尽情享受属于你的歌曲吧！"], callback);
+  }, 8000); 
 }
 
 function showFinalEndScreen(){

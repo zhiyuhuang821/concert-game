@@ -1,0 +1,35 @@
+function triggerHiddenScene(callback){
+  charLayer.style.display = 'none'; // 让人物消失
+  dialogBox.style.pointerEvents = 'none'; // 动画时禁止点击
+  
+  const hiddenImg = document.getElementById('hidden-img');
+  hiddenImg.style.display = 'block';
+  let frame = 1;
+  let animInt = setInterval(()=>{
+    frame++; if(frame > 4) frame = 1;
+    hiddenImg.src = `hidden${frame}.png`;
+  }, 2000); // 每张照片停留2秒
+
+  setTimeout(()=>{
+    clearInterval(animInt);
+    hiddenImg.style.display = 'none';
+    dialogBox.style.pointerEvents = 'auto';
+    // 动画播完，直接进最后的歌单界面，或者补一句台词都可以
+    showDialog(["江山：接下来，请尽情享受属于你的歌曲吧！"], callback);
+  }, 8000); // 4张图 x 2秒 = 8秒
+}
+
+function showFinalEndScreen(){
+document.getElementById('dialog-box').style.display='none';
+endScreen.style.display='flex';
+setTimeout(()=>{ endScreen.classList.add('show'); }, 50);
+
+let maxKey='songA',maxVal=weights.songA;['songB','songC','songD'].forEach(k=>{if(weights[k]>maxVal){maxVal=weights[k];maxKey=k}});
+const albumImg=document.getElementById('album-img'),playBtn=document.getElementById('play-song-btn'),danceFace=document.getElementById('dance-face'),danceMusic=document.getElementById('dance-music'),danceContainer=document.getElementById('dance-container');
+albumImg.src=`album${maxKey.replace('song','')}.jpg`;albumImg.style.display='block';playBtn.style.display='block';
+let dState=false;danceContainer.style.display='flex';let dInt=setInterval(()=>{dState=!dState;if(dState){danceFace.src='player_happy.png';danceMusic.style.display='inline-block'}else{danceFace.src='player_normal.png';danceMusic.style.display='none'}},1500);
+playBtn.onclick=()=>{playClick();playBtn.style.display='none';albumImg.classList.add('playing');const audio=document.getElementById('media'+maxKey.replace('song',''));audio.play().catch(()=>{});if(weights.bonus>=2){setTimeout(()=>{document.getElementById('mediaBonus').play().catch(()=>{})},5000)}}
+}
+</script>
+</body>
+</html>
