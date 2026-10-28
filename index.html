@@ -30,12 +30,9 @@ body{background:#111;display:flex;justify-content:center;align-items:center;heig
 #game-layer{display:none;position:absolute;inset:0;z-index:40;background:#2a2a35}
 canvas{width:100%;height:100%;display:block;image-rendering:pixelated;touch-action:none}
 #fail-overlay{display:none;position:absolute;top:20%;left:50%;transform:translateX(-50%);width:120px;height:120px;z-index:45;image-rendering:pixelated}
-
-/* 👇 通关过渡界面 */
 #clear-overlay {position:absolute;inset:0;background:#000;z-index:45;display:none;justify-content:center;align-items:center;opacity:0;transition:opacity 1s}
 #clear-overlay.show {opacity:1}
 #clear-overlay h1 {color:#ffd93d;font-size:36px;letter-spacing:4px;text-shadow:0 0 20px #ffd93d;animation:pulse 1s infinite}
-
 #end-screen{position:absolute;inset:0;background:rgba(0,0,0,0.95);display:flex;flex-direction:column;justify-content:center;align-items:center;gap:15px;padding:20px;z-index:50;backdrop-filter:blur(4px);opacity:0;pointer-events:none;transition:opacity 1.5s ease}
 #end-screen.show{opacity:1;pointer-events:auto;}
 #end-screen h1{color:#ffd93d;font-size:26px;margin:0;text-shadow:2px 2px 0 #000}
@@ -167,7 +164,6 @@ function showChoices(c){
 
 function spawnLightsticks(){fxContainer.innerHTML='';for(let i=0;i<25;i++){let l=document.createElement('img');l.className='lightstick';l.src=Math.random()>.5?'light1.png':'light2.png';l.style.display='block';l.style.left=(10+Math.random()*330)+'px';l.style.top=(50+Math.random()*400)+'px';l.style.animationDelay=(Math.random()*1)+'s';fxContainer.appendChild(l)}}
 
-// 👇 核心修复：在点击开始的时候，偷偷把所有音频空播一遍，拿到手机系统的播放权限！
 titleScreen.onclick=()=>{
   playClick();
   titleScreen.style.display='none';
@@ -195,27 +191,31 @@ showDialog(["江山：请保持良好秩序，请勿拥挤、推搡，安全第�
   callAudio.play().catch(()=>{});
   isCallingPlaying = true; 
   
+  // 👇 修复：不再用 onended（容易被拦截），直接定时 6 秒（calling 时长）后自动走下一步
   setTimeout(()=>{
     if(isCallingPlaying) {
-      callAudio.onended=()=>{
-        isCallingPlaying = false;
-        triggerCharacterWalkOut();
-      };
+      isCallingPlaying = false;
+      triggerCharacterWalkOut();
     }
-  }, 2500);
+  }, 6000); 
 });
 }
 
 function triggerCharacterWalkOut(){
   const callAudio=document.getElementById('bgmCalling');
   callAudio.onended = null; 
+  callAudio.pause(); // 如果提前点了，强制停掉
   
   charLayer.style.display='flex';charImg.src='player_normal.png';charImg.style.display='block';charLayer.style.transform='translateX(-50%) translateY(200px)';
   setTimeout(()=>{charLayer.style.transform='translateX(-50%) translateY(0)'},50);
   
   setTimeout(()=>{
     const cheer=document.getElementById('bgmCheering');
-    cheer.currentTime=0;cheer.play().catch(()=>{});
+    cheer.pause();
+    cheer.currentTime=0;
+    cheer.volume = 1;
+    cheer.play().catch(()=>{});
+    
     charImg.src='player_happy.png';
     showDialog(["江山：欢迎大家来到我的演唱会，我是歌手江山。"],showChoice1)
   },2500);
@@ -225,8 +225,12 @@ function showChoice1(){showChoices([
 {label:"A. 大声欢呼",callback:()=>{
   weights.songB+=1;
   const cheer=document.getElementById('bgmCheering');
-  cheer.pause(); cheer.currentTime=0; 
-  setTimeout(()=>{cheer.play().catch(()=>{})}, 50); 
+  // 👇 修复：强行重置并稍微延迟播放，避免手机连续触发被静音
+  cheer.pause(); 
+  cheer.currentTime=0; 
+  cheer.volume = 1;
+  setTimeout(()=>{cheer.play().catch(()=>{})}, 100); 
+  
   sceneNext1();
 }},
 {label:"B. 摇晃应援棒",callback:()=>{spawnLightsticks();sceneNext1()}},
