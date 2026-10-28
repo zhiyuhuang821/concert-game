@@ -87,6 +87,9 @@ canvas{width:100%;height:100%;display:block;image-rendering:pixelated;touch-acti
 <div id="flashbang"></div>
 </div>
 
+<!-- 👇 这就是那个隐形的“全屏封印层”，用来吃掉黑屏期间的所有点击 -->
+<div id="click-blocker" style="display:none; position:absolute; inset:0; z-index:9999;"></div>
+
 <audio id="sfxClick" src="sfx_click.mp3" preload="auto"></audio>
 <audio id="bgmCalling" src="calling.mp3" preload="auto"></audio>
 <audio id="bgmCheering" src="cheering.mp3" preload="auto"></audio>
@@ -99,14 +102,15 @@ canvas{width:100%;height:100%;display:block;image-rendering:pixelated;touch-acti
 
 <script>
 const bgLayer=document.getElementById('bg-layer'),charLayer=document.getElementById('char-layer'),charImg=document.getElementById('char-img'),dialogText=document.getElementById('dialog-text'),choicesContainer=document.getElementById('choices-container'),fxContainer=document.getElementById('fx-container'),showcaseItem=document.getElementById('showcase-item'),musicEaster=document.getElementById('music-easter'),titleScreen=document.getElementById('title-screen'),endScreen=document.getElementById('end-screen'),flashbang=document.getElementById('flashbang'),gameWrap=document.getElementById('game-wrap'),vortex=document.getElementById('vortex-overlay'),dialogBox=document.getElementById('dialog-box'),clearOverlay=document.getElementById('clear-overlay');
+const clickBlocker = document.getElementById('click-blocker'); // 👈 获取封印层
+
 let weights={songA:0,songB:0,songC:0,songD:0,bonus:0,hidden:0},typingTimer=null,isTyping=false,currentFullText='',dialogQueue=[],onDialogComplete=null;
 let memTimeouts=[];
-let isWelcomeShown = false; // 👈 新增：防止“欢迎大家”重复触发的状态锁
+let isWelcomeShown = false; 
 
 function playClick(){const s=document.getElementById('sfxClick');s.currentTime=0;s.volume=.6;s.play().catch(()=>{})}
 function clearMemTimeouts(){memTimeouts.forEach(t=>clearTimeout(t));memTimeouts=[];}
 
-// 返璞归真的弹窗机制
 function showDialog(t,c){
   clearMemTimeouts();
   dialogQueue=[...t];
@@ -117,7 +121,6 @@ function showDialog(t,c){
   isTyping = false;
   clearInterval(typingTimer);
   
-  // 清理旧事件，绑新事件
   dialogBox.onclick = null;
   dialogBox.onclick = () => {
     playClick();
@@ -223,9 +226,9 @@ function triggerCharacterWalkOut(){
     
     charImg.src='player_happy.png';
     
-    // 👇 核心修复：用状态锁，保证“欢迎大家”绝对只弹一次
     if(!isWelcomeShown) {
       isWelcomeShown = true;
+      // 👇 改成了“谷江山”
       showDialog(["江山：欢迎大家来到我的演唱会，我是歌手谷江山。"],showChoice1);
     }
     
@@ -444,8 +447,11 @@ initGameEngine();running=true;drawGame();loopGame();
 }
 
 function endGameEngine(isWin){
-  document.getElementById('game-layer').style.pointerEvents = 'none';
   running=false;
+  
+  // 👇 出现封印，吃掉黑屏期间的所有点击
+  clickBlocker.style.display = 'block'; 
+  
   document.getElementById('bgmGame').pause();
   document.getElementById('game-layer').style.display='none';
   document.getElementById('dialog-box').style.display='flex';
@@ -457,7 +463,10 @@ function endGameEngine(isWin){
     let isH=false;
     failAnimInterval=setInterval(()=>{fo.src=isH?'player_hurt.png':'player_normal.png';isH=!isH},150);
     showDialog(["江山：赶紧再试一次，一次失败有什么了不起？"],()=>{
-      clearInterval(failAnimInterval);fo.style.display='none';startGame();
+      clearInterval(failAnimInterval);
+      fo.style.display='none';
+      clickBlocker.style.display = 'none'; // 失败重开时解除封印
+      startGame();
     });
     document.getElementById('dialog-box').style.opacity = '1';
     return;
@@ -477,6 +486,9 @@ function endGameEngine(isWin){
       bgLayer.style.filter='brightness(1)';
 
       setTimeout(()=>{
+        // 👇 黑屏渐变彻底结束，解除封印
+        clickBlocker.style.display = 'none';
+        
         charLayer.style.display='flex';
         charLayer.style.opacity='1'; 
         charImg.src='player_normal.png';
@@ -515,14 +527,14 @@ function triggerHiddenScene(callback){
   let animInt = setInterval(()=>{
     frame++; if(frame > 4) frame = 1;
     hiddenImg.src = `hidden${frame}.png`;
-  }, 2000);
+  }, 1000);
 
   setTimeout(()=>{
     clearInterval(animInt);
     hiddenImg.style.display = 'none';
     dialogBox.style.pointerEvents = 'auto';
     showDialog(["江山：接下来，请尽情享受属于你的歌曲吧！"], callback);
-  }, 8000); 
+  }, 4000); 
 }
 
 function showFinalEndScreen(){
