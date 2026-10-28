@@ -164,13 +164,13 @@ function showChoices(c){
 
 function spawnLightsticks(){fxContainer.innerHTML='';for(let i=0;i<25;i++){let l=document.createElement('img');l.className='lightstick';l.src=Math.random()>.5?'light1.png':'light2.png';l.style.display='block';l.style.left=(10+Math.random()*330)+'px';l.style.top=(50+Math.random()*400)+'px';l.style.animationDelay=(Math.random()*1)+'s';fxContainer.appendChild(l)}}
 
+// 👇 修复：只解锁短音效，不碰 BGM 和歌曲，防止串音
 titleScreen.onclick=()=>{
   playClick();
   titleScreen.style.display='none';
   
-  // 解锁所有音频
-  const audios = ['bgmCalling','bgmCheering','bgmGame','mediaA','mediaB','mediaC','mediaD','mediaBonus'];
-  audios.forEach(id => {
+  const unlockIds = ['bgmCalling','bgmCheering','sfxClick'];
+  unlockIds.forEach(id => {
     let a = document.getElementById(id);
     a.volume = 0;
     a.play().then(() => {
@@ -191,7 +191,6 @@ showDialog(["江山：请保持良好秩序，请勿拥挤、推搡，安全第�
   callAudio.play().catch(()=>{});
   isCallingPlaying = true; 
   
-  // 👇 修复：不再用 onended（容易被拦截），直接定时 6 秒（calling 时长）后自动走下一步
   setTimeout(()=>{
     if(isCallingPlaying) {
       isCallingPlaying = false;
@@ -204,7 +203,7 @@ showDialog(["江山：请保持良好秩序，请勿拥挤、推搡，安全第�
 function triggerCharacterWalkOut(){
   const callAudio=document.getElementById('bgmCalling');
   callAudio.onended = null; 
-  callAudio.pause(); // 如果提前点了，强制停掉
+  callAudio.pause(); 
   
   charLayer.style.display='flex';charImg.src='player_normal.png';charImg.style.display='block';charLayer.style.transform='translateX(-50%) translateY(200px)';
   setTimeout(()=>{charLayer.style.transform='translateX(-50%) translateY(0)'},50);
@@ -225,11 +224,11 @@ function showChoice1(){showChoices([
 {label:"A. 大声欢呼",callback:()=>{
   weights.songB+=1;
   const cheer=document.getElementById('bgmCheering');
-  // 👇 修复：强行重置并稍微延迟播放，避免手机连续触发被静音
   cheer.pause(); 
   cheer.currentTime=0; 
   cheer.volume = 1;
-  setTimeout(()=>{cheer.play().catch(()=>{})}, 100); 
+  // 延迟50毫秒，错开前一个声音的尾音，防止被手机静音
+  setTimeout(()=>{cheer.play().catch(()=>{})}, 50); 
   
   sceneNext1();
 }},
