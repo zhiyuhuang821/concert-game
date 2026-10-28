@@ -87,10 +87,8 @@ canvas{width:100%;height:100%;display:block;image-rendering:pixelated;touch-acti
 <div id="flashbang"></div>
 </div>
 
-<!-- 封印层 -->
 <div id="click-blocker" style="display:none; position:absolute; inset:0; z-index:9999;"></div>
 
-<!-- 注意：calling和cheering的audio标签我保留着但代码里不用了，你如果想彻底删掉这两行也可以 -->
 <audio id="sfxClick" src="sfx_click.mp3" preload="auto"></audio>
 <audio id="bgmGame" src="bgm_game.mp3" loop preload="auto"></audio>
 <audio id="mediaA" src="songA.mp3" preload="auto"></audio>
@@ -180,19 +178,22 @@ function spawnLightsticks(){fxContainer.innerHTML='';for(let i=0;i<25;i++){let l
 titleScreen.onclick=()=>{
   playClick();
   titleScreen.style.display='none';
-  
-  // 去掉了解锁音频的代码
-
   startStory();
 };
 
 function startStory(){
 bgLayer.style.backgroundColor='#1a1a2e';bgLayer.style.backgroundImage='none';charLayer.style.display='none';
-showDialog(["江山：请保持良好秩序，请勿拥挤、推搡，安全第一。","江山：我们的音乐之旅，即将开启。","（上班！上班！上班！......）"],()=>{
-  
+// 👇 更新了开场的对话文本
+showDialog([
+  "江山：请保持良好秩序，请勿拥挤、推搡，安全第一。",
+  "江山：我们的音乐之旅，即将开启。",
+  "（窸窸窣窣几句之后，渐渐传来整齐的呼喊）",
+  "\"上班！上班！上班！......\"",
+  "......"
+],()=>{
   setTimeout(()=>{
     triggerCharacterWalkOut();
-  }, 1000); // 把原来的 6000 改成了 1 秒，因为没音频了，不用等那么久
+  }, 1000); 
 });
 }
 
@@ -205,7 +206,11 @@ function triggerCharacterWalkOut(){
     
     if(!isWelcomeShown) {
       isWelcomeShown = true;
-      showDialog(["（现场响起热情的欢呼声）","江山：欢迎大家来到我的演唱会，我是歌手谷江山。"],showChoice1);
+      // 👇 更新了欢呼和谷江山
+      showDialog([
+        "（场馆中响起热情的欢呼声）",
+        "江山：欢迎大家来到我的演唱会，我是歌手谷江山。"
+      ],showChoice1);
     }
     
   },2500);
@@ -214,14 +219,29 @@ function triggerCharacterWalkOut(){
 function showChoice1(){showChoices([
 {label:"A. 大声欢呼",callback:()=>{
   weights.songB+=1;
-  // 去掉了cheer音频，加上了文字
-  showDialog(["（现场响起热情的欢呼声）"], sceneNext1);
+  // 👇 更新了A选项的文本
+  showDialog(["（欢呼声此起彼伏）"], sceneNext1);
 }},
 {label:"B. 摇晃应援棒",callback:()=>{spawnLightsticks();sceneNext1()}},
-{label:"C. 喊他的名字",callback:()=>{weights.songC+=1;weights.hidden+=1;sceneNext1()}}
+{label:"C. 喊他的名字",callback:()=>{weights.songC+=1;weights.hidden+=1;
+  // 👇 更新了C选项的文本
+  showDialog(["\"谷江山！------\""], sceneNext1);
+}}
 ])}
 
-function sceneNext1(){charImg.src='player_normal.png';showDialog(["江山：谢谢大家。"],()=>{fxContainer.innerHTML='';bgLayer.style.filter='brightness(0.2)';showDialog(["（忽然灯光昏暗下来）"],()=>{charImg.src='player_question.png';showDialog(["（发生了什么？）"],showChoice2)})})}
+function sceneNext1(){
+  charImg.src='player_happy.png';
+  // 👇 更新了谢谢大家和忽然黑屏的文本
+    showDialog(["江山：谢谢大家。","（忽然）"],()=>{
+    bgLayer.style.filter='brightness(0.1)'; // 屏幕黑
+    charImg.src='player_normal.png'; // 说话的时候变回 normal（但这里是黑屏过渡）
+    fxContainer.innerHTML = '';
+    showDialog(["（四周的灯光暗了下来）","（发生了什么？）"],()=>{
+      charImg.src='player_question.png';
+      showChoice2();
+    });
+  });
+}
 
 function showChoice2(){showChoices([
 {label:"A. 灯光坏了",callback:()=>{weights.songD+=1;subA()}},
@@ -233,14 +253,15 @@ function subA(){showDialog(["江山：灯光好像出了些问题。"],returnToM
 function subB(){showDialog(["江山：音响好像出了些问题。"],returnToMain)}
 function subC(){
 charImg.src='player_happy.png';
-setTimeout(()=>{
-let bc=0;
-let bi=setInterval(()=>{
-charImg.style.opacity=charImg.style.opacity==='0'?'1':'0';
-bc++;
-if(bc>6){clearInterval(bi);charImg.style.display='none';returnToMain()}
-},100)
-},2000) 
+// 👇 更新了C支线的文本
+showDialog(["江山：谢谢你们......"],()=>{
+  let bc=0;
+  let bi=setInterval(()=>{
+    charImg.style.opacity=charImg.style.opacity==='0'?'1':'0';
+    bc++;
+    if(bc>6){clearInterval(bi);charImg.style.display='none';returnToMain()}
+  },100)
+});
 }
 
 function returnToMain(){
@@ -263,7 +284,8 @@ function showcaseItemsSequentially(callback){
   function showNext(){
     if(idx>=items.length){
       dialogBox.style.pointerEvents='auto';
-      showDialog(["（这是......）","（回忆......?）"],callback);
+      // 👇 更新了回忆前的文本
+      showDialog(["（这是......）","（好像什么东西忽然间出现在脑海里。）","（......回忆?）"],callback);
       return;
     }
 
@@ -292,7 +314,8 @@ function showcaseItemsSequentially(callback){
     showcaseItem.style.display='none';
     dialogText.innerText='';
     playClick();
-    showDialog(["（这是......）","（回忆......?）"],callback);
+    // 👇 更新了跳过展示时的文本
+    showDialog(["（这是......）","（好像什么东西忽然间出现在脑海里。）","（......回忆?）"],callback);
   };
 }
 
@@ -339,13 +362,21 @@ bgLayer.classList.add('glitch');
 setTimeout(()=>{
 bgLayer.classList.remove('glitch');bgLayer.style.backgroundColor='#fff';bgLayer.style.backgroundImage='none';
 setTimeout(()=>{
+// 👇 更新了白屏的文本
 showDialog([
+"（眼前的场景从昏暗的场馆变成一片空白）",
+"（大脑有些混乱，好像失去了什么似的......）",
+"（这时，一个声音在耳边响起。）",
 "？：你已经忘记自己从何而来。",
+"......",
+"？：你已经忘记......",
 "？：你忘记了自己的过去，曾经的嘲讽、非议，曾经的支持、掌声，你在自己的人生中走过的每一步，你陪着他走过的每一步。什么都不复存在。",
-"？：金钱、期望、审判。来自四方八面的压力早就将你击溃。你不再是过去的自己了。",
+"？：金钱、期望、审判。来自四面八方的压力早就将你击溃。你不再是过去的自己了。",
 "（不、不是这样的。）",
-"（不对......）",
-"（不！那我因为什么而来到这里呢？）"
+"(不对......)",
+"......",
+"（不！那我因为什么而来到这里呢？）",
+"（......）"
 ], finalFlashAndStart);
 },2000)
 },2000)
@@ -418,7 +449,7 @@ initGameEngine();running=true;drawGame();loopGame();
 
 function endGameEngine(isWin){
   running=false;
-  clickBlocker.style.display = 'block'; // 👈 封印黑屏点击
+  clickBlocker.style.display = 'block'; 
   
   document.getElementById('bgmGame').pause();
   document.getElementById('game-layer').style.display='none';
@@ -430,6 +461,7 @@ function endGameEngine(isWin){
     fo.style.display='block';
     let isH=false;
     failAnimInterval=setInterval(()=>{fo.src=isH?'player_hurt.png':'player_normal.png';isH=!isH},150);
+    // 👇 更新了失败文本
     showDialog(["江山：赶紧再试一次，一次失败有什么了不起？"],()=>{
       clearInterval(failAnimInterval);
       fo.style.display='none';
@@ -454,8 +486,9 @@ function endGameEngine(isWin){
       bgLayer.style.filter='brightness(1)';
 
       setTimeout(()=>{
-        clickBlocker.style.display = 'none'; // 👈 解除封印
-        
+        clickBlocker.style.display = 'none'; 
+                // 👇 加上这行，强行把小人拉到屏幕中央，绝对不隐身
+        charLayer.style.cssText = 'display:flex; opacity:1; transform:translate(-50%, 0); transition:none;';
         charLayer.style.display='flex';
         charLayer.style.opacity='1'; 
         charImg.src='player_normal.png';
@@ -469,7 +502,16 @@ function endGameEngine(isWin){
         setTimeout(()=>{
           charImg.src='player_happy.png';
           
-          showDialog(["江山：谢谢大家。","江山：没有大家，就没有今天的我。","（没有你，也不会有此刻的我们......）"], ()=>{
+          // 👇 更新了结局谢幕文本
+          showDialog([
+            "江山：谢谢大家。",
+            "江山：没有大家，就没有今天的我。",
+            "（想起刚刚在回忆中出现的种种。）",
+            "（再次抬起头，看向舞台中央的他）",
+            "......",
+            "（没有你，也不会有此刻的我们。）",
+            "（是我，要谢谢你啊。）"
+          ], ()=>{
             if(weights.hidden >= 2){
                triggerHiddenScene(showFinalEndScreen);
             } else {
@@ -494,14 +536,14 @@ function triggerHiddenScene(callback){
   let animInt = setInterval(()=>{
     frame++; if(frame > 4) frame = 1;
     hiddenImg.src = `hidden${frame}.png`;
-  }, 1000); // 👈 改成 1 秒了
+  }, 1000); 
 
   setTimeout(()=>{
     clearInterval(animInt);
     hiddenImg.style.display = 'none';
     dialogBox.style.pointerEvents = 'auto';
     showDialog(["江山：接下来，请尽情享受属于你的歌曲吧！"], callback);
-  }, 4000); // 👈 改成 4 秒了
+  }, 4000); 
 }
 
 function showFinalEndScreen(){
