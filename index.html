@@ -87,12 +87,11 @@ canvas{width:100%;height:100%;display:block;image-rendering:pixelated;touch-acti
 <div id="flashbang"></div>
 </div>
 
-<!-- 👇 这就是那个隐形的“全屏封印层”，用来吃掉黑屏期间的所有点击 -->
+<!-- 封印层 -->
 <div id="click-blocker" style="display:none; position:absolute; inset:0; z-index:9999;"></div>
 
+<!-- 注意：calling和cheering的audio标签我保留着但代码里不用了，你如果想彻底删掉这两行也可以 -->
 <audio id="sfxClick" src="sfx_click.mp3" preload="auto"></audio>
-<audio id="bgmCalling" src="calling.mp3" preload="auto"></audio>
-<audio id="bgmCheering" src="cheering.mp3" preload="auto"></audio>
 <audio id="bgmGame" src="bgm_game.mp3" loop preload="auto"></audio>
 <audio id="mediaA" src="songA.mp3" preload="auto"></audio>
 <audio id="mediaB" src="songB.mp3" preload="auto"></audio>
@@ -102,7 +101,7 @@ canvas{width:100%;height:100%;display:block;image-rendering:pixelated;touch-acti
 
 <script>
 const bgLayer=document.getElementById('bg-layer'),charLayer=document.getElementById('char-layer'),charImg=document.getElementById('char-img'),dialogText=document.getElementById('dialog-text'),choicesContainer=document.getElementById('choices-container'),fxContainer=document.getElementById('fx-container'),showcaseItem=document.getElementById('showcase-item'),musicEaster=document.getElementById('music-easter'),titleScreen=document.getElementById('title-screen'),endScreen=document.getElementById('end-screen'),flashbang=document.getElementById('flashbang'),gameWrap=document.getElementById('game-wrap'),vortex=document.getElementById('vortex-overlay'),dialogBox=document.getElementById('dialog-box'),clearOverlay=document.getElementById('clear-overlay');
-const clickBlocker = document.getElementById('click-blocker'); // 👈 获取封印层
+const clickBlocker = document.getElementById('click-blocker');
 
 let weights={songA:0,songB:0,songC:0,songD:0,bonus:0,hidden:0},typingTimer=null,isTyping=false,currentFullText='',dialogQueue=[],onDialogComplete=null;
 let memTimeouts=[];
@@ -182,54 +181,31 @@ titleScreen.onclick=()=>{
   playClick();
   titleScreen.style.display='none';
   
-  ['bgmCalling','bgmCheering','sfxClick'].forEach(id => {
-    let a = document.getElementById(id);
-    a.volume = 0;
-    a.play().then(() => {
-      a.pause();
-      a.currentTime = 0;
-      a.volume = 1;
-    }).catch(()=>{});
-  });
+  // 去掉了解锁音频的代码
 
   startStory();
 };
 
 function startStory(){
 bgLayer.style.backgroundColor='#1a1a2e';bgLayer.style.backgroundImage='none';charLayer.style.display='none';
-showDialog(["江山：请保持良好秩序，请勿拥挤、推搡，安全第一。","江山：我们的音乐之旅，即将开启。"],()=>{
-  const callAudio=document.getElementById('bgmCalling');
-  callAudio.currentTime=0;
-  callAudio.play().catch(()=>{});
+showDialog(["江山：请保持良好秩序，请勿拥挤、推搡，安全第一。","江山：我们的音乐之旅，即将开启。","（上班！上班！上班！......）"],()=>{
   
   setTimeout(()=>{
     triggerCharacterWalkOut();
-  }, 6000); 
+  }, 1000); // 把原来的 6000 改成了 1 秒，因为没音频了，不用等那么久
 });
 }
 
 function triggerCharacterWalkOut(){
-  const callAudio=document.getElementById('bgmCalling');
-  if(callAudio) callAudio.pause(); 
-  
   charLayer.style.display='flex';charImg.src='player_normal.png';charImg.style.display='block';charLayer.style.transform='translateX(-50%) translateY(200px)';
   setTimeout(()=>{charLayer.style.transform='translateX(-50%) translateY(0)'},50);
   
   setTimeout(()=>{
-    const cheer=document.getElementById('bgmCheering');
-    if(cheer) {
-      cheer.pause();
-      cheer.currentTime=0;
-      cheer.volume = 1;
-      cheer.play().catch(()=>{});
-    }
-    
     charImg.src='player_happy.png';
     
     if(!isWelcomeShown) {
       isWelcomeShown = true;
-      // 👇 改成了“谷江山”
-      showDialog(["江山：欢迎大家来到我的演唱会，我是歌手谷江山。"],showChoice1);
+      showDialog(["（现场响起热情的欢呼声）","江山：欢迎大家来到我的演唱会，我是歌手谷江山。"],showChoice1);
     }
     
   },2500);
@@ -238,14 +214,8 @@ function triggerCharacterWalkOut(){
 function showChoice1(){showChoices([
 {label:"A. 大声欢呼",callback:()=>{
   weights.songB+=1;
-  const cheer=document.getElementById('bgmCheering');
-  if(cheer) {
-    cheer.pause(); 
-    cheer.currentTime=0; 
-    cheer.volume = 1;
-    setTimeout(()=>{cheer.play().catch(()=>{})}, 50); 
-  }
-  sceneNext1();
+  // 去掉了cheer音频，加上了文字
+  showDialog(["（现场响起热情的欢呼声）"], sceneNext1);
 }},
 {label:"B. 摇晃应援棒",callback:()=>{spawnLightsticks();sceneNext1()}},
 {label:"C. 喊他的名字",callback:()=>{weights.songC+=1;weights.hidden+=1;sceneNext1()}}
@@ -448,9 +418,7 @@ initGameEngine();running=true;drawGame();loopGame();
 
 function endGameEngine(isWin){
   running=false;
-  
-  // 👇 出现封印，吃掉黑屏期间的所有点击
-  clickBlocker.style.display = 'block'; 
+  clickBlocker.style.display = 'block'; // 👈 封印黑屏点击
   
   document.getElementById('bgmGame').pause();
   document.getElementById('game-layer').style.display='none';
@@ -465,7 +433,7 @@ function endGameEngine(isWin){
     showDialog(["江山：赶紧再试一次，一次失败有什么了不起？"],()=>{
       clearInterval(failAnimInterval);
       fo.style.display='none';
-      clickBlocker.style.display = 'none'; // 失败重开时解除封印
+      clickBlocker.style.display = 'none'; 
       startGame();
     });
     document.getElementById('dialog-box').style.opacity = '1';
@@ -486,8 +454,7 @@ function endGameEngine(isWin){
       bgLayer.style.filter='brightness(1)';
 
       setTimeout(()=>{
-        // 👇 黑屏渐变彻底结束，解除封印
-        clickBlocker.style.display = 'none';
+        clickBlocker.style.display = 'none'; // 👈 解除封印
         
         charLayer.style.display='flex';
         charLayer.style.opacity='1'; 
@@ -527,14 +494,14 @@ function triggerHiddenScene(callback){
   let animInt = setInterval(()=>{
     frame++; if(frame > 4) frame = 1;
     hiddenImg.src = `hidden${frame}.png`;
-  }, 1000);
+  }, 1000); // 👈 改成 1 秒了
 
   setTimeout(()=>{
     clearInterval(animInt);
     hiddenImg.style.display = 'none';
     dialogBox.style.pointerEvents = 'auto';
     showDialog(["江山：接下来，请尽情享受属于你的歌曲吧！"], callback);
-  }, 4000); 
+  }, 4000); // 👈 改成 4 秒了
 }
 
 function showFinalEndScreen(){
