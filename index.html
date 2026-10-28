@@ -166,7 +166,26 @@ function showChoices(c){
 }
 
 function spawnLightsticks(){fxContainer.innerHTML='';for(let i=0;i<25;i++){let l=document.createElement('img');l.className='lightstick';l.src=Math.random()>.5?'light1.png':'light2.png';l.style.display='block';l.style.left=(10+Math.random()*330)+'px';l.style.top=(50+Math.random()*400)+'px';l.style.animationDelay=(Math.random()*1)+'s';fxContainer.appendChild(l)}}
-titleScreen.onclick=()=>{playClick();titleScreen.style.display='none';startStory()};
+
+// 👇 核心修复：在点击开始的时候，偷偷把所有音频空播一遍，拿到手机系统的播放权限！
+titleScreen.onclick=()=>{
+  playClick();
+  titleScreen.style.display='none';
+  
+  // 解锁所有音频
+  const audios = ['bgmCalling','bgmCheering','bgmGame','mediaA','mediaB','mediaC','mediaD','mediaBonus'];
+  audios.forEach(id => {
+    let a = document.getElementById(id);
+    a.volume = 0;
+    a.play().then(() => {
+      a.pause();
+      a.currentTime = 0;
+      a.volume = 1;
+    }).catch(()=>{});
+  });
+
+  startStory();
+};
 
 function startStory(){
 bgLayer.style.backgroundColor='#1a1a2e';bgLayer.style.backgroundImage='none';charLayer.style.display='none';
@@ -441,7 +460,6 @@ function endGameEngine(isWin){
     return;
   }
 
-  // 👇 显示通关过渡界面
   clearOverlay.style.display = 'flex';
   setTimeout(()=>{ clearOverlay.classList.add('show'); }, 50);
 
@@ -450,7 +468,6 @@ function endGameEngine(isWin){
     setTimeout(()=>{
       clearOverlay.style.display = 'none';
       
-      // 渐变黑屏
       bgLayer.style.transition = 'background-color 1.5s ease';
       bgLayer.style.backgroundColor='#000';
       bgLayer.style.backgroundImage='none';
@@ -477,8 +494,8 @@ function endGameEngine(isWin){
         }, 2000);
       }, 1500); 
 
-    }, 1000); // 等 CLEAR 渐隐
-  }, 2500); // CLEAR 停留 2.5 秒
+    }, 1000); 
+  }, 2500); 
 }
 
 function showFinalEndScreen(){
