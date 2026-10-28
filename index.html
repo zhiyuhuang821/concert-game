@@ -1,623 +1,497 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>follow</title>
-  <style>
-    body {
-      background: #1a1a1a; 
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      margin: 0;
-      font-family: "Courier New", monospace;
-      touch-action: none; 
-      overflow: hidden;
-    }
-    #game-wrap { position: relative; width: 360px; height: 640px; max-width: 100vw; max-height: 100vh; }
-    canvas { 
-      background: #2a2a35; 
-      display: block; 
-      width: 100%; height: 100%;
-      image-rendering: pixelated;
-      touch-action: none;
-    }
-    .overlay {
-      position: absolute; inset: 0;
-      background: rgba(0,0,0,0.85);
-      display: flex; flex-direction: column;
-      justify-content: center; align-items: center;
-      gap: 15px; color: #fff; text-align: center; padding: 20px;
-      backdrop-filter: blur(4px);
-      z-index: 10;
-    }
-    .overlay.hidden { display: none; }
-    
-    .overlay h1 { 
-      color: #ffd93d; 
-      font-size: 26px; 
-      margin: 0; 
-      text-shadow: 2px 2px 0 #000; 
-      letter-spacing: 1px;
-      line-height: 1.2;
-      display: flex;
-      flex-direction: column;
-    }
-    .overlay p { font-size: 15px; color: #ccc; line-height: 1.6; margin: 5px 0; }
-    
-    /* 👇 小人放大，音符保持 */
-    .dance-container {
-      display: none;
-      align-items: center;
-      justify-content: flex-start;
-      gap: 0; 
-      height: 100px;
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      z-index: 20;
-    }
-    #dance-face {
-      height: 100px; /* 小人变成 100px */
-      image-rendering: pixelated;
-    }
-    #dance-music {
-      height: 30px; /* 音符依然是 30px */
-      image-rendering: pixelated;
-      display: none; 
-      margin-left: 2px; 
-    }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>VRM Live Simulator</title>
+<style>
+body{background:#111;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;font-family:"Courier New",monospace;color:#fff;overflow:hidden;touch-action:none}
+#game-wrap{position:relative;width:360px;height:640px;background:#000;overflow:hidden}
+#bg-layer{position:absolute;inset:0;background-color:#1a1a2e;background-size:cover;background-position:center;z-index:1;transition:background-image 1.5s,filter 1s,background-color 1.5s}
+#char-layer{position:absolute;bottom:180px;left:50%;transform:translateX(-50%);height:220px;width:220px;z-index:5;display:flex;justify-content:center;align-items:flex-end;transition:opacity 1s,transform 2.5s ease-out}
+#char-img{height:100%;image-rendering:pixelated;display:none}
+.lightstick{position:absolute;width:25px;height:25px;border-radius:50%;pointer-events:none;animation:flash 1.2s infinite alternate;z-index:6;display:none;image-rendering:pixelated}
+@keyframes flash{0%{opacity:.1;transform:scale(.8) rotate(-10deg)}100%{opacity:1;transform:scale(1.2) rotate(10deg)}}
+#showcase-item{position:absolute;top:45%;left:50%;transform:translate(-50%,-50%) scale(0);width:150px;height:150px;z-index:15;image-rendering:pixelated;transition:transform .3s cubic-bezier(.175,.885,.32,1.275);display:none;filter:drop-shadow(0 0 20px #4ecdc4)}
+#showcase-item.pop{transform:translate(-50%,-50%) scale(1)}
+#music-easter{position:absolute;top:30%;left:50%;transform:translate(-50%,-50%);width:80px;height:80px;z-index:18;image-rendering:pixelated;display:none;animation:heartbeat 0.8s infinite alternate}
+@keyframes heartbeat{0%{transform:translate(-50%,-50%) scale(0.9);opacity:0.8}100%{transform:translate(-50%,-50%) scale(1.2);opacity:1}}
+#dialog-box{position:absolute;bottom:0;left:0;right:0;background:rgba(240,240,240,.95);border-top:4px solid #4ecdc4;padding:20px;min-height:130px;z-index:20;cursor:pointer;display:flex;flex-direction:column;justify-content:flex-start;color:#111;box-shadow:0 -5px 20px rgba(0,0,0,.5);pointer-events:auto;transition:opacity 0.5s}
+#dialog-text{font-size:16px;line-height:1.6;letter-spacing:1px;white-space:pre-wrap;font-weight:bold}
+.shake{animation:shake-anim .1s linear infinite}
+@keyframes shake-anim{0%{transform:translate(0,0)}25%{transform:translate(-5px,5px)}50%{transform:translate(5px,-5px)}75%{transform:translate(-5px,-5px)}100%{transform:translate(5px,5px)}}
+.glitch{animation:glitch-anim .1s linear infinite}
+@keyframes glitch-anim{0%{transform:translate(0)}20%{transform:translate(-10px,10px)}40%{transform:translate(-10px,-10px)}60%{transform:translate(10px,10px)}80%{transform:translate(10px,-10px)}100%{transform:translate(0)}}
+#flashbang{position:absolute;inset:0;background:#fff;z-index:99;display:none;opacity:0;pointer-events:none}
+#vortex-overlay{position:absolute;inset:0;background:radial-gradient(circle,transparent 0%,#000 100%);z-index:90;opacity:0;pointer-events:none;transition:opacity 1s}
+#choices-container{position:absolute;inset:0;background:rgba(0,0,0,.7);z-index:30;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:15px;padding:30px;display:none;pointer-events:none;}
+.choice-btn{background:#111;color:#fff;border:2px solid #4ecdc4;padding:12px 20px;width:100%;font-family:inherit;font-size:15px;cursor:pointer;transition:.2s;text-align:left;box-shadow:4px 4px 0 #000;pointer-events:auto;}
+.choice-btn:hover{background:#4ecdc4;color:#111;font-weight:bold}
+#game-layer{display:none;position:absolute;inset:0;z-index:40;background:#2a2a35}
+canvas{width:100%;height:100%;display:block;image-rendering:pixelated;touch-action:none}
+#fail-overlay{display:none;position:absolute;top:20%;left:50%;transform:translateX(-50%);width:120px;height:120px;z-index:45;image-rendering:pixelated}
 
-    .media-container {
-      width: 220px; height: 220px;
-      margin-bottom: 5px;
-      position: relative;
-      display: flex; justify-content: center; align-items: center;
-    }
-    
-    #album-img {
-      width: 100%; height: 100%;
-      border: 4px solid #4ecdc4; 
-      border-radius: 50%; 
-      object-fit: cover; 
-      box-shadow: 0 0 20px rgba(78, 205, 196, 0.4);
-      display: none; background: #222;
-      transition: box-shadow 0.3s;
-    }
-    
-    #album-img.playing {
-      animation: spin 10s linear infinite; 
-      box-shadow: 0 0 30px #4ecdc4, inset 0 0 15px #4ecdc4; 
-    }
-    @keyframes spin { 100% { transform: rotate(360deg); } }
+/* 👇 通关过渡界面 */
+#clear-overlay {position:absolute;inset:0;background:#000;z-index:45;display:none;justify-content:center;align-items:center;opacity:0;transition:opacity 1s}
+#clear-overlay.show {opacity:1}
+#clear-overlay h1 {color:#ffd93d;font-size:36px;letter-spacing:4px;text-shadow:0 0 20px #ffd93d;animation:pulse 1s infinite}
 
-    #fail-anim, #hidden-anim {
-      width: 100%; height: 100%;
-      display: none; image-rendering: pixelated;
-    }
-
-    button {
-      font-family: inherit; font-size: 16px; padding: 10px 24px;
-      background: #4ecdc4; color: #111; border: none; cursor: pointer;
-      box-shadow: 4px 4px 0 #fff; font-weight: bold; margin-top: 10px;
-      border-radius: 4px;
-    }
-    button:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 #fff; }
-    
-    .btn-group { display: flex; gap: 15px; margin-top: 10px; }
-    .btn-yes { background: #b388ff; }
-
-    #skip-btn {
-      position: absolute; bottom: 30px; right: 20px;
-      background: transparent; color: #666; border: none; box-shadow: none;
-      font-size: 12px; cursor: pointer; z-index: 10;
-    }
-    
-    #play-song-btn {
-      display: none;
-      background: #ffd93d;
-      font-size: 18px;
-      padding: 12px 30px;
-      animation: pulse 1.5s infinite;
-    }
-    @keyframes pulse {
-      0% { transform: scale(1); box-shadow: 4px 4px 0 #fff; }
-      50% { transform: scale(1.05); box-shadow: 6px 6px 0 #fff; }
-      100% { transform: scale(1); box-shadow: 4px 4px 0 #fff; }
-    }
-    
-    @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.2; } 100% { opacity: 1; } }
-  </style>
+#end-screen{position:absolute;inset:0;background:rgba(0,0,0,0.95);display:flex;flex-direction:column;justify-content:center;align-items:center;gap:15px;padding:20px;z-index:50;backdrop-filter:blur(4px);opacity:0;pointer-events:none;transition:opacity 1.5s ease}
+#end-screen.show{opacity:1;pointer-events:auto;}
+#end-screen h1{color:#ffd93d;font-size:26px;margin:0;text-shadow:2px 2px 0 #000}
+#album-img{width:220px;height:220px;border:4px solid #4ecdc4;border-radius:50%;object-fit:cover;box-shadow:0 0 20px rgba(78,205,196,.4);display:none;background:#222;transition:box-shadow .3s}
+#album-img.playing{animation:spin 10s linear infinite;box-shadow:0 0 30px #4ecdc4,inset 0 0 15px #4ecdc4}
+@keyframes spin{100%{transform:rotate(360deg)}}
+#dance-container{display:none;align-items:center;justify-content:flex-start;gap:0;height:100px;position:absolute;top:10px;left:10px;z-index:55}
+#dance-face{height:100px;image-rendering:pixelated}
+#dance-music{height:30px;image-rendering:pixelated;display:none;margin-left:2px}
+#play-song-btn{display:none;background:#ffd93d;font-size:18px;padding:12px 30px;border:none;cursor:pointer;font-family:inherit;font-weight:bold;box-shadow:4px 4px 0 #fff;border-radius:4px;animation:pulse 1.5s infinite}
+@keyframes pulse{0%{transform:scale(1)}50%{transform:scale(1.05)}100%{transform:scale(1)}}
+#title-screen{position:absolute;inset:0;background:#1a1a2e;z-index:100;display:flex;flex-direction:column;justify-content:center;align-items:center;overflow:hidden}
+#title-screen h1{color:#ffd93d;font-size:28px;text-shadow:3px 3px 0 #4ecdc4;text-align:center;margin-bottom:20px;z-index:2}
+#title-screen p{color:#fff;font-size:16px;animation:blink 1.5s infinite;cursor:pointer;z-index:2;letter-spacing:2px}
+.star-pixel{position:absolute;width:6px;height:6px;background:#fff;box-shadow:0 0 10px #fff;animation:twinkle 2s infinite alternate}
+.star-pixel:nth-child(2n){background:#4ecdc4;box-shadow:0 0 10px #4ecdc4;animation-duration:1.5s}
+.star-pixel:nth-child(3n){background:#ffd93d;box-shadow:0 0 10px #ffd93d;animation-duration:2.5s}
+@keyframes twinkle{0%{opacity:.1;transform:scale(.5)}100%{opacity:1;transform:scale(1.5)}}
+@keyframes blink{0%{opacity:1}50%{opacity:.2}100%{opacity:1}}
+</style>
 </head>
 <body>
-  <div id="game-wrap">
-    <canvas id="game" width="360" height="640"></canvas>
+<div id="game-wrap">
+<div id="title-screen">
+<script>for(let i=0;i<20;i++){document.write(`<div class="star-pixel" style="left:${Math.random()*100}%;top:${Math.random()*100}%;"></div>`)}</script>
+<h1>VRM LIVE<br>SIMULATOR</h1>
+<p>TAP TO START</p>
+</div>
+<div id="bg-layer"></div>
+<div id="char-layer"><img id="char-img" src="" alt="char"></div>
+<div id="fx-container"></div>
+<img id="showcase-item" src="" alt="item">
+<img id="music-easter" src="music.png" alt="music">
+<img id="fail-overlay" src="player_normal.png" alt="fail">
+<div id="vortex-overlay"></div>
+<div id="dialog-box"><div id="dialog-text"></div></div>
+<div id="choices-container"></div>
+<div id="game-layer"><canvas id="game" width="360" height="640"></canvas></div>
+<div id="clear-overlay"><h1>CLEAR!</h1></div>
 
-    <div id="start-screen" class="overlay hidden">
-      <h1>
-        <span>VRM</span>
-        <span>PIXEL CATCH</span>
-      </h1>
-      <p>左右移动，接住掉落物<br>小心炸弹扣分！</p>
-      <button id="start-btn">TAP TO START</button>
-    </div>
+<div id="end-screen">
+<div id="dance-container">
+<img id="dance-face" src="player_normal.png" alt="face">
+<img id="dance-music" src="music.png" alt="music">
+</div>
+<img id="album-img" src="" alt="Album Cover" onerror="this.style.display='none'">
+<h1 id="end-title">CLEAR!</h1>
+<p id="end-desc">正在播放...</p>
+<button id="play-song-btn">▶ 点击播放歌曲</button>
+</div>
+<div id="flashbang"></div>
+</div>
 
-    <div id="end-screen" class="overlay hidden">
-      
-      <div id="dance-container" class="dance-container">
-        <img id="dance-face" src="player_normal.png" alt="face">
-        <img id="dance-music" src="music.png" alt="music">
-      </div>
+<audio id="sfxClick" src="sfx_click.mp3" preload="auto"></audio>
+<audio id="bgmCalling" src="calling.mp3" preload="auto"></audio>
+<audio id="bgmCheering" src="cheering.mp3" preload="auto"></audio>
+<audio id="bgmGame" src="bgm_game.mp3" loop preload="auto"></audio>
+<audio id="mediaA" src="songA.mp3" preload="auto"></audio>
+<audio id="mediaB" src="songB.mp3" preload="auto"></audio>
+<audio id="mediaC" src="songC.mp3" preload="auto"></audio>
+<audio id="mediaD" src="songD.mp3" preload="auto"></audio>
+<audio id="mediaBonus" src="bonus.mp3" preload="auto"></audio>
 
-      <div class="media-container">
-        <img id="album-img" src="" alt="Album Cover" onerror="this.style.display='none'">
-        <img id="fail-anim" src="player_normal.png" alt="Fail Animation">
-        <img id="hidden-anim" src="hidden1.png" alt="Hidden Animation">
-      </div>
-      
-      <h1 id="end-title">CLEAR!</h1>
-      
-      <p id="loading-hint" style="display: none; color: #ffd93d; font-size: 14px; font-weight: bold; animation: blink 1s infinite;">LOADING...</p>
-      
-      <p id="end-desc">即将播放...</p>
-      
-      <button id="play-song-btn">▶ 点击播放歌曲</button>
-      
-      <button id="replay-btn" style="display: none;">再玩一次</button>
-      
-      <div id="hidden-prompt" class="btn-group" style="display: none;">
-        <button id="unlock-hidden-btn" class="btn-yes">是，解锁隐藏！</button>
-        <button id="skip-hidden-btn">跳过</button>
-      </div>
-    </div>
+<script>
+const bgLayer=document.getElementById('bg-layer'),charLayer=document.getElementById('char-layer'),charImg=document.getElementById('char-img'),dialogText=document.getElementById('dialog-text'),choicesContainer=document.getElementById('choices-container'),fxContainer=document.getElementById('fx-container'),showcaseItem=document.getElementById('showcase-item'),musicEaster=document.getElementById('music-easter'),titleScreen=document.getElementById('title-screen'),endScreen=document.getElementById('end-screen'),flashbang=document.getElementById('flashbang'),gameWrap=document.getElementById('game-wrap'),vortex=document.getElementById('vortex-overlay'),dialogBox=document.getElementById('dialog-box'),clearOverlay=document.getElementById('clear-overlay');
+let weights={songA:0,songB:0,songC:0,songD:0,bonus:0,hidden:0},typingTimer=null,isTyping=false,currentFullText='',dialogQueue=[],onDialogComplete=null;
+let memTimeouts=[];
+let isCallingPlaying = false;
+let lockClick = false;
 
-    <button id="skip-btn">SKIP >></button>
-  </div>
+function playClick(){const s=document.getElementById('sfxClick');s.currentTime=0;s.volume=.6;s.play().catch(()=>{})}
+function clearMemTimeouts(){memTimeouts.forEach(t=>clearTimeout(t));memTimeouts=[];}
 
-  <audio id="bgmIntro" src="bgm_intro.mp3" loop preload="auto"></audio>
-  <audio id="bgmGame" src="bgm_game.mp3" loop preload="auto"></audio>
-  <audio id="sfxClick" src="sfx_click.mp3" preload="auto"></audio>
+function bindDialogClick(action){
+  dialogBox.onclick = null;
+  dialogBox.onclick = (e)=>{
+    e.stopPropagation();
+    if(lockClick) return;
+    playClick();
+    action();
+  };
+}
 
-  <audio id="mediaA" src="songA.mp3" preload="auto"></audio>
-  <audio id="mediaB" src="songB.mp3" preload="auto"></audio>
-  <audio id="mediaC" src="songC.mp3" preload="auto"></audio>
-  <audio id="mediaD" src="songD.mp3" preload="auto"></audio>
+function showDialog(t,c){
+  clearMemTimeouts();
+  lockClick = false;
+  dialogQueue=[...t];onDialogComplete=c;choicesContainer.style.display='none';choicesContainer.innerHTML='';
+  dialogBox.style.pointerEvents='auto'; 
+  nextDialogLine();
+}
+
+function nextDialogLine(){
+  if(dialogQueue.length===0){if(onDialogComplete)onDialogComplete();return}
+  currentFullText=dialogQueue.shift();dialogText.innerText='';isTyping=true;
+  let i=0;clearInterval(typingTimer);
+  typingTimer=setInterval(()=>{if(i<currentFullText.length){dialogText.innerText+=currentFullText.charAt(i);i++}else{clearInterval(typingTimer);isTyping=false}},100)
+}
+
+bindDialogClick(()=>{
+  if (isCallingPlaying) {
+    isCallingPlaying = false;
+    const callAudio = document.getElementById('bgmCalling');
+    callAudio.pause();
+    triggerCharacterWalkOut(); 
+    return;
+  }
   
-  <audio id="mediaFail" src="fail.mp3" preload="auto"></audio>
-  <audio id="mediaHidden" src="songHidden.mp3" preload="auto"></audio>
+  if(isTyping){clearInterval(typingTimer);dialogText.innerText=currentFullText;isTyping=false}
+  else if(dialogQueue.length>0)nextDialogLine();
+  else if(onDialogComplete)onDialogComplete();
+});
 
-  <script>
-    const canvas = document.getElementById('game');
-    const ctx = canvas.getContext('2d');
-    const W = canvas.width, H = canvas.height;
-
-    ctx.imageSmoothingEnabled = false;
-
-    const PLAYER_W = 176, PLAYER_H = 176, PLAYER_Y = H - 170, PLAYER_EDGE_PADDING = 40; 
-    const ITEM_SIZE = 64, SPAWN_INTERVAL = 50, BASE_SPEED = 1.8, TARGET_SCORE = 20, MAX_FAILS = 5;
-
-    const imgBg = new Image(); imgBg.src = 'bg.png';
-    const BIRD_W = 144, BIRD_H = 96; 
-    const imgBirdLeft = new Image(); imgBirdLeft.src = 'bird_left.png';
-    const imgBirdRight = new Image(); imgBirdRight.src = 'bird_right.png';
-    const imgNormal = new Image(); imgNormal.src = 'player_normal.png';
-    const imgHappy  = new Image(); imgHappy.src = 'player_happy.png';
-    const imgHurt   = new Image(); imgHurt.src = 'player_hurt.png';
-    
-    const itemImgs = { A: new Image(), B: new Image(), C: new Image(), D: new Image(), X: new Image() };
-    itemImgs.A.src = 'A.png'; itemImgs.B.src = 'B.png'; itemImgs.C.src = 'C.png'; itemImgs.D.src = 'D.png'; itemImgs.X.src = 'hurt.png'; 
-
-    const ITEM_NAMES = { A: '❤️', B: '🎤', C: '⛰️', D: '🧋' };
-    const TYPES = {
-      A: { color: '#ffd93d', score: 1,  label: 'A' },
-      B: { color: '#ff6b9d', score: 1,  label: 'B' },
-      C: { color: '#4ecdc4', score: 1,  label: 'C' },
-      D: { color: '#b388ff', score: 1,  label: 'D' },
-      X: { color: '#e94560', score: -1, label: 'X' }
+function showChoices(c){
+  choicesContainer.style.display='flex';choicesContainer.innerHTML='';
+  c.forEach(o=>{
+    let b=document.createElement('button');
+    b.className='choice-btn';b.innerText=o.label;
+    b.onclick=(e)=>{
+      e.stopPropagation(); 
+      b.style.pointerEvents='none'; 
+      playClick();
+      choicesContainer.style.display='none';
+      choicesContainer.innerHTML=''; 
+      o.callback(); 
     };
+    choicesContainer.appendChild(b);
+  });
+}
 
-    const startScreen = document.getElementById('start-screen');
-    const endScreen = document.getElementById('end-screen');
-    const skipBtn = document.getElementById('skip-btn');
-    const endTitle = document.getElementById('end-title');
-    const endDesc = document.getElementById('end-desc');
-    const albumImg = document.getElementById('album-img');
-    const loadingHint = document.getElementById('loading-hint'); 
-    
-    const failAnim = document.getElementById('fail-anim'); 
-    const hiddenAnim = document.getElementById('hidden-anim');
-    const startBtn = document.getElementById('start-btn');
-    const replayBtn = document.getElementById('replay-btn');
-    const playSongBtn = document.getElementById('play-song-btn'); 
-    
-    const hiddenPrompt = document.getElementById('hidden-prompt');
-    const unlockHiddenBtn = document.getElementById('unlock-hidden-btn');
-    const skipHiddenBtn = document.getElementById('skip-hidden-btn');
+function spawnLightsticks(){fxContainer.innerHTML='';for(let i=0;i<25;i++){let l=document.createElement('img');l.className='lightstick';l.src=Math.random()>.5?'light1.png':'light2.png';l.style.display='block';l.style.left=(10+Math.random()*330)+'px';l.style.top=(50+Math.random()*400)+'px';l.style.animationDelay=(Math.random()*1)+'s';fxContainer.appendChild(l)}}
+titleScreen.onclick=()=>{playClick();titleScreen.style.display='none';startStory()};
 
-    const danceContainer = document.getElementById('dance-container');
-    const danceFace = document.getElementById('dance-face');
-    const danceMusic = document.getElementById('dance-music');
-    
-    const medias = {
-      A: document.getElementById('mediaA'),
-      B: document.getElementById('mediaB'),
-      C: document.getElementById('mediaC'),
-      D: document.getElementById('mediaD'),
-      Fail: document.getElementById('mediaFail'), 
-      Hidden: document.getElementById('mediaHidden')
-    };
-
-    const bgmIntro = document.getElementById('bgmIntro');
-    const bgmGame = document.getElementById('bgmGame');
-    const sfxClick = document.getElementById('sfxClick');
-
-    let currentBest = 'A'; 
-    let playerX, items, frameCount, score, gameOver, counts;
-    let running = false;
-    let expressionTimer = 0, currentExpression = 'normal'; 
-    let birds = [], BIRD_SPAWN_INTERVAL = 150; 
-    let isPlayingIntro = true, introFrame = 0, introPlayerX = -PLAYER_W; 
-    
-    let failAnimInterval = null;
-    let hiddenAnimInterval = null;
-    let hiddenFrameIndex = 1;
-
-    let danceInterval = null;
-    let danceState = false;
-
-    function playClick() {
-      sfxClick.currentTime = 0; 
-      sfxClick.volume = 0.6;
-      sfxClick.play().catch(() => {});
+function startStory(){
+bgLayer.style.backgroundColor='#1a1a2e';bgLayer.style.backgroundImage='none';charLayer.style.display='none';
+showDialog(["江山：请保持良好秩序，请勿拥挤、推搡，安全第一。","江山：我们的音乐之旅，即将开启。"],()=>{
+  const callAudio=document.getElementById('bgmCalling');
+  callAudio.currentTime=0;
+  callAudio.play().catch(()=>{});
+  isCallingPlaying = true; 
+  
+  setTimeout(()=>{
+    if(isCallingPlaying) {
+      callAudio.onended=()=>{
+        isCallingPlaying = false;
+        triggerCharacterWalkOut();
+      };
     }
+  }, 2500);
+});
+}
 
-    function initGame() {
-      playerX = W / 2 - PLAYER_W / 2;
-      items = []; birds = []; frameCount = 0; score = 0;
-      counts = { A: 0, B: 0, C: 0, D: 0, X: 0 };
-      gameOver = false; expressionTimer = 0; currentExpression = 'normal';
-      
-      if (failAnimInterval) clearInterval(failAnimInterval);
-      if (hiddenAnimInterval) clearInterval(hiddenAnimInterval);
-      if (danceInterval) clearInterval(danceInterval); 
-      
-      albumImg.style.display = 'none';
-      albumImg.classList.remove('playing'); 
-      failAnim.style.display = 'none';
-      hiddenAnim.style.display = 'none';
-      replayBtn.style.display = 'none';
-      playSongBtn.style.display = 'none'; 
-      hiddenPrompt.style.display = 'none';
-      loadingHint.style.display = 'none'; 
-      danceContainer.style.display = 'none'; 
-      
-      Object.values(medias).forEach(m => { m.pause(); m.currentTime = 0; });
-      bgmGame.pause(); bgmGame.currentTime = 0;
-    }
+function triggerCharacterWalkOut(){
+  const callAudio=document.getElementById('bgmCalling');
+  callAudio.onended = null; 
+  
+  charLayer.style.display='flex';charImg.src='player_normal.png';charImg.style.display='block';charLayer.style.transform='translateX(-50%) translateY(200px)';
+  setTimeout(()=>{charLayer.style.transform='translateX(-50%) translateY(0)'},50);
+  
+  setTimeout(()=>{
+    const cheer=document.getElementById('bgmCheering');
+    cheer.currentTime=0;cheer.play().catch(()=>{});
+    charImg.src='player_happy.png';
+    showDialog(["江山：欢迎大家来到我的演唱会，我是歌手江山。"],showChoice1)
+  },2500);
+}
 
-    function movePlayerTo(clientX) {
-      const rect = canvas.getBoundingClientRect();
-      const scaleX = W / rect.width;
-      playerX = (clientX - rect.left) * scaleX - PLAYER_W / 2;
-      playerX = Math.max(-PLAYER_EDGE_PADDING, Math.min(W - PLAYER_W + PLAYER_EDGE_PADDING, playerX));
-    }
+function showChoice1(){showChoices([
+{label:"A. 大声欢呼",callback:()=>{
+  weights.songB+=1;
+  const cheer=document.getElementById('bgmCheering');
+  cheer.pause(); cheer.currentTime=0; 
+  setTimeout(()=>{cheer.play().catch(()=>{})}, 50); 
+  sceneNext1();
+}},
+{label:"B. 摇晃应援棒",callback:()=>{spawnLightsticks();sceneNext1()}},
+{label:"C. 喊他的名字",callback:()=>{weights.songC+=1;weights.hidden+=1;sceneNext1()}}
+])}
 
-    canvas.addEventListener('mousemove', (e) => { if (running) movePlayerTo(e.clientX); });
-    canvas.addEventListener('touchstart', (e) => { if (running) { e.preventDefault(); movePlayerTo(e.touches[0].clientX); } }, { passive: false });
-    canvas.addEventListener('touchmove', (e) => { if (running) { e.preventDefault(); movePlayerTo(e.touches[0].clientX); } }, { passive: false });
+function sceneNext1(){charImg.src='player_normal.png';showDialog(["江山：谢谢大家。"],()=>{fxContainer.innerHTML='';bgLayer.style.filter='brightness(0.2)';showDialog(["（忽然灯光昏暗下来）"],()=>{charImg.src='player_question.png';showDialog(["（发生了什么？）"],showChoice2)})})}
 
-    function randomType() {
-      const r = Math.random();
-      if (r < 0.20) return 'A'; if (r < 0.40) return 'B';
-      if (r < 0.60) return 'C'; if (r < 0.85) return 'D'; 
-      return 'X'; 
-    }
+function showChoice2(){showChoices([
+{label:"A. 灯光坏了",callback:()=>{weights.songD+=1;subA()}},
+{label:"B. 音响坏了",callback:()=>{weights.bonus+=1;subB()}},
+{label:"C. 不管了继续喊",callback:()=>{weights.songC+=1;weights.hidden+=1;subC()}}
+])}
 
-    function spawnItem() {
-      items.push({
-        type: randomType(),
-        x: Math.random() * (W - ITEM_SIZE),
-        y: -ITEM_SIZE,
-        speed: BASE_SPEED + Math.random() * 1.5
+function subA(){showDialog(["江山：灯光好像出了些问题。"],returnToMain)}
+function subB(){showDialog(["江山：音响好像出了些问题。"],returnToMain)}
+function subC(){
+charImg.src='player_happy.png';
+setTimeout(()=>{
+let bc=0;
+let bi=setInterval(()=>{
+charImg.style.opacity=charImg.style.opacity==='0'?'1':'0';
+bc++;
+if(bc>6){clearInterval(bi);charImg.style.display='none';returnToMain()}
+},100)
+},2000) 
+}
+
+function returnToMain(){
+charLayer.style.display='none';vortex.style.opacity='1';
+setTimeout(()=>{
+bgLayer.style.filter='brightness(1)';bgLayer.style.backgroundColor='#000';vortex.style.opacity='0';
+showcaseItemsSequentially(showChoice3);
+},1500)
+}
+
+function showcaseItemsSequentially(callback){
+  clearMemTimeouts();
+  dialogBox.style.pointerEvents='none'; 
+  dialogText.innerText='';
+  showcaseItem.style.display='none';
+
+  let items=['A.png','B.png','C.png','D.png'];
+  let idx=0;
+
+  function showNext(){
+    if(idx>=items.length){
+      dialogBox.style.pointerEvents='auto';
+      bindDialogClick(()=>{
+        if(isTyping){clearInterval(typingTimer);dialogText.innerText=currentFullText;isTyping=false}
+        else if(dialogQueue.length>0)nextDialogLine();
+        else if(onDialogComplete)onDialogComplete();
       });
+      showDialog(["（这是......）","（回忆......?）"],callback);
+      return;
     }
 
-    function spawnBird() {
-      const y = 50 + Math.random() * (H / 2 - 100);
-      const speed = 2 + Math.random() * 3; 
-      const fromLeft = Math.random() < 0.5;
-      birds.push({ x: fromLeft ? -BIRD_W : W, y, vx: fromLeft ? speed : -speed, fromLeft });
-    }
+    gameWrap.classList.add('shake');
+    showcaseItem.src=items[idx];
+    showcaseItem.style.display='block';
+    showcaseItem.classList.add('pop');
 
-    function update() {
-      if (gameOver) return;
-      frameCount++;
+    memTimeouts.push(setTimeout(()=>{
+      gameWrap.classList.remove('shake');
+      showcaseItem.classList.remove('pop');
+      memTimeouts.push(setTimeout(()=>{
+        showcaseItem.style.display='none';
+        idx++;
+        showNext();
+      }, 300)); 
+    }, 300)); 
+  }
+  
+  showNext();
 
-      if (frameCount % SPAWN_INTERVAL === 0) spawnItem();
-      if (frameCount % BIRD_SPAWN_INTERVAL === 0 && imgBirdLeft.complete && imgBirdRight.complete) spawnBird();
+  dialogBox.style.pointerEvents='auto';
+  dialogBox.onclick = ()=>{
+    clearMemTimeouts(); 
+    gameWrap.classList.remove('shake');
+    showcaseItem.style.display='none';
+    dialogText.innerText='';
+    playClick();
+    bindDialogClick(()=>{
+        if(isTyping){clearInterval(typingTimer);dialogText.innerText=currentFullText;isTyping=false}
+        else if(dialogQueue.length>0)nextDialogLine();
+        else if(onDialogComplete)onDialogComplete();
+    });
+    showDialog(["（这是......）","（回忆......?）"],callback);
+  };
+}
 
-      if (expressionTimer > 0) {
-        expressionTimer--;
-        if (expressionTimer === 0) currentExpression = 'normal';
-      }
+function showChoice3(){showChoices([
+{label:"A. 想起自己艰难的时候耳机里的声音",callback:()=>{weights.songA+=2;subA1()}},
+{label:"B. 想起很久以前直播时的事情",callback:()=>{weights.songB+=1;subB1()}},
+{label:"C. 不管了继续喊",callback:()=>{weights.bonus+=1;weights.hidden+=1;returnToMain2()}}
+])}
 
-      for (let i = birds.length - 1; i >= 0; i--) {
-        const b = birds[i]; b.x += b.vx;
-        if ((b.vx > 0 && b.x > W) || (b.vx < 0 && b.x < -BIRD_W)) birds.splice(i, 1);
-      }
+function subA1(){
+dialogQueue=[
+"（那时候的生活灰暗密布，麻木地学习、工作，麻木地活着，麻木地做梦......）",
+"（一次次望向窗外，却不知道自己到底该去向何方。）",
+"（可也总是那个时候，耳机里恰如其分地响起他的声音。）",
+"（于是，就会想。）",
+"（明天，或许会是一个晴天吧。）"
+];
+onDialogComplete=returnToMain2;choicesContainer.style.display='none';
+let i=0;
+function nextA1(){
+  if(dialogQueue.length===0){if(onDialogComplete)onDialogComplete();return}
+  currentFullText=dialogQueue.shift();
+  if(currentFullText.includes("恰如其分地响起他的声音")){
+    musicEaster.style.display='block';
+    setTimeout(()=>{musicEaster.style.display='none'},2000);
+  }
+  dialogText.innerText='';isTyping=true;let j=0;clearInterval(typingTimer);
+  typingTimer=setInterval(()=>{if(j<currentFullText.length){dialogText.innerText+=currentFullText.charAt(j);j++}else{clearInterval(typingTimer);isTyping=false}},100)
+}
+nextA1();
+bindDialogClick(()=>{
+  if(isTyping){clearInterval(typingTimer);dialogText.innerText=currentFullText;isTyping=false}
+  else if(dialogQueue.length>0)nextA1();
+  else if(onDialogComplete)onDialogComplete();
+});
+}
 
-      for (let i = items.length - 1; i >= 0; i--) {
-        const it = items[i];
-        it.y += it.speed;
+function subB1(){showDialog(["（想起来还有点想笑，那时候我们都年纪很小呢。）","（那时候的大家都想象不到未来会是什么样子，也许还会躲起来偷偷流泪。）","（......但是如今，我们都站在这里。）"],returnToMain2)}
+function returnToMain2(){if(weights.hidden>=3){triggerHiddenScene(glitchScene)}else{glitchScene()}}
 
-        const playerCenterX = playerX + PLAYER_W / 2;
-        const itemCenterX = it.x + ITEM_SIZE / 2;
-        const hitX = Math.abs(playerCenterX - itemCenterX) < 55;
-        const hitY = it.y + ITEM_SIZE >= PLAYER_Y + 30 && it.y + ITEM_SIZE <= PLAYER_Y + PLAYER_H;
+function glitchScene(){
+bgLayer.classList.add('glitch');
+setTimeout(()=>{
+bgLayer.classList.remove('glitch');bgLayer.style.backgroundColor='#fff';bgLayer.style.backgroundImage='none';
+setTimeout(()=>{
+showDialog([
+"？：你已经忘记自己从何而来。",
+"？：你忘记了自己的过去，曾经的嘲讽、非议，曾经的支持、掌声，你在自己的人生中走过的每一步，你陪着他走过的每一步。什么都不复存在。",
+"？：金钱、期望、审判。来自四方八面的压力早就将你击溃。你不再是过去的自己了。",
+"（不、不是这样的。）",
+"（不对......）",
+"（不！那我因为什么而来到这里呢？）"
+], finalFlashAndStart);
+},2000)
+},2000)
+}
 
-        if (hitY && hitX) {
-          const def = TYPES[it.type];
-          counts[it.type]++;
-          score += def.score;
-          if (score < 0) score = 0;
+function finalFlashAndStart(){
+dialogText.innerText="";
+bgLayer.style.backgroundColor='#fff';
+bgLayer.style.backgroundImage='none';
 
-          if (it.type === 'X') {
-            currentExpression = 'hurt'; expressionTimer = 45; 
-          } else {
-            currentExpression = 'happy'; expressionTimer = 25; 
-          }
+flashbang.style.display='block';
+flashbang.style.transition='opacity 0.2s';
+flashbang.style.opacity='1';
 
-          if (score >= TARGET_SCORE) { endGame(true); return; }
-          if (counts.X >= MAX_FAILS) { endGame(false); return; }
+setTimeout(()=>{
+  flashbang.style.opacity='0';
+  setTimeout(()=>{flashbang.style.display='none';}, 200);
+  
+  gameWrap.classList.add('shake');
+  setTimeout(()=>gameWrap.classList.remove('shake'), 200); 
 
-          items.splice(i, 1);
-          continue;
-        }
-        if (it.y > H) items.splice(i, 1);
-      }
-    }
+  bgLayer.style.backgroundColor='#111';
+  bgLayer.classList.add('glitch');
+  
+  setTimeout(()=>{
+    bgLayer.classList.remove('glitch');
+    bgLayer.style.backgroundImage="url('bg.png')";
+    dialogText.style.fontSize='20px';
+    setTimeout(()=>{
+      showDialog(["请和江山一起，接住你们一步一步走来的过去吧。"],startGame)
+    }, 800)
+  }, 2000);
+}, 300);
+}
 
-    function draw() {
-      if (imgBg.complete && imgBg.naturalWidth > 0) {
-        ctx.drawImage(imgBg, 0, 0, W, H);
-      } else {
-        ctx.fillStyle = '#2a2a35'; ctx.fillRect(0, 0, W, H);
-      }
+function triggerHiddenScene(callback){callback()}
 
-      birds.forEach(b => {
-        const activeBirdImg = b.fromLeft ? imgBirdRight : imgBirdLeft;
-        if (activeBirdImg.complete) ctx.drawImage(activeBirdImg, b.x, b.y, BIRD_W, BIRD_H);
-      });
+const canvas=document.getElementById('game'),ctx=canvas.getContext('2d'),W=canvas.width,H=canvas.height;ctx.imageSmoothingEnabled=false;
+const PLAYER_W=176,PLAYER_H=176,PLAYER_Y=H-170,PLAYER_EDGE_PADDING=40,ITEM_SIZE=64,SPAWN_INTERVAL=80,BASE_SPEED=1.2,TARGET_SCORE=20,MAX_FAILS=5;
+const imgBg=new Image();imgBg.src='bg.png';const BIRD_W=144,BIRD_H=96;const imgBirdLeft=new Image();imgBirdLeft.src='bird_left.png';const imgBirdRight=new Image();imgBirdRight.src='bird_right.png';const imgNormal=new Image();imgNormal.src='player_normal.png';const imgHappy=new Image();imgHappy.src='player_happy.png';const imgHurt=new Image();imgHurt.src='player_hurt.png';
+const itemImgs={A:new Image(),B:new Image(),C:new Image(),D:new Image(),X:new Image()};itemImgs.A.src='A.png';itemImgs.B.src='B.png';itemImgs.C.src='C.png';itemImgs.D.src='D.png';itemImgs.X.src='hurt.png';
+const TYPES={A:{score:1},B:{score:1},C:{score:1},D:{score:1},X:{score:-1}};
+let playerX,items,frameCount,score,gameOver,counts,running=false,expressionTimer=0,currentExpression='normal',birds=[],BIRD_SPAWN_INTERVAL=200,failAnimInterval=null;
 
-      items.forEach(it => {
-        const def = TYPES[it.type]; const img = itemImgs[it.type];
-        if (img.complete && img.naturalWidth > 0) {
-          ctx.drawImage(img, it.x, it.y, ITEM_SIZE, ITEM_SIZE);
-        } else {
-          ctx.fillStyle = def.color; ctx.fillRect(it.x, it.y, ITEM_SIZE, ITEM_SIZE);
-        }
-      });
+function initGameEngine(){playerX=W/2-PLAYER_W/2;items=[];birds=[];frameCount=0;score=0;counts={A:0,B:0,C:0,D:0,X:0};gameOver=false;expressionTimer=0;currentExpression='normal';if(failAnimInterval)clearInterval(failAnimInterval)}
+function movePlayerTo(cx){const rect=canvas.getBoundingClientRect(),sx=W/rect.width;playerX=(cx-rect.left)*sx-PLAYER_W/2;playerX=Math.max(-PLAYER_EDGE_PADDING,Math.min(W-PLAYER_W+PLAYER_EDGE_PADDING,playerX))}
+canvas.addEventListener('mousemove',e=>{if(running)movePlayerTo(e.clientX)});canvas.addEventListener('touchstart',e=>{if(running){e.preventDefault();movePlayerTo(e.touches[0].clientX)}},{passive:false});canvas.addEventListener('touchmove',e=>{if(running){e.preventDefault();movePlayerTo(e.touches[0].clientX)}},{passive:false});
+function randomType(){const r=Math.random();if(r<.2)return'A';if(r<.4)return'B';if(r<.6)return'C';if(r<.85)return'D';return'X'}
+function spawnItem(){items.push({type:randomType(),x:Math.random()*(W-ITEM_SIZE),y:-ITEM_SIZE,speed:BASE_SPEED+Math.random()*1})}
+function spawnBird(){const y=50+Math.random()*(H/2-100),s=1+Math.random()*2,fl=Math.random()<.5;birds.push({x:fl?-BIRD_W:W,y,vx:fl?s:-s,fromLeft:fl})}
 
-      let activeImg = imgNormal;
-      if (currentExpression === 'happy' && imgHappy.complete) activeImg = imgHappy;
-      if (currentExpression === 'hurt' && imgHurt.complete) activeImg = imgHurt;
+function updateGame(){if(gameOver)return;frameCount++;if(frameCount%SPAWN_INTERVAL===0)spawnItem();if(frameCount%BIRD_SPAWN_INTERVAL===0&&imgBirdLeft.complete&&imgBirdRight.complete)spawnBird();if(expressionTimer>0){expressionTimer--;if(expressionTimer===0)currentExpression='normal'}
+for(let i=birds.length-1;i>=0;i--){const b=birds[i];b.x+=b.vx;if((b.vx>0&&b.x>W)||(b.vx<0&&b.x<-BIRD_W))birds.splice(i,1)}
+for(let i=items.length-1;i>=0;i--){const it=items[i];it.y+=it.speed;const pc=playerX+PLAYER_W/2,ic=it.x+ITEM_SIZE/2;const hx=Math.abs(pc-ic)<55,hy=it.y+ITEM_SIZE>=PLAYER_Y+30&&it.y+ITEM_SIZE<=PLAYER_Y+PLAYER_H;
+if(hy&&hx){const def=TYPES[it.type];counts[it.type]++;score+=def.score;if(score<0)score=0;if(it.type==='X'){currentExpression='hurt';expressionTimer=45}else{currentExpression='happy';expressionTimer=25}
+if(score>=TARGET_SCORE){endGameEngine(true);return}if(counts.X>=MAX_FAILS){endGameEngine(false);return}items.splice(i,1);continue}if(it.y>H)items.splice(i,1)}}
+
+function drawGame(){if(imgBg.complete&&imgBg.naturalWidth>0)ctx.drawImage(imgBg,0,0,W,H);else{ctx.fillStyle='#2a2a35';ctx.fillRect(0,0,W,H)}birds.forEach(b=>{const active=b.fromLeft?imgBirdRight:imgBirdLeft;if(active.complete)ctx.drawImage(active,b.x,b.y,BIRD_W,BIRD_H)});
+items.forEach(it=>{const img=itemImgs[it.type];if(img.complete&&img.naturalWidth>0)ctx.drawImage(img,it.x,it.y,ITEM_SIZE,ITEM_SIZE);else{ctx.fillStyle='#fff';ctx.fillRect(it.x,it.y,ITEM_SIZE,ITEM_SIZE)}});
+let active=imgNormal;if(currentExpression==='happy'&&imgHappy.complete)active=imgHappy;if(currentExpression==='hurt'&&imgHurt.complete)active=imgHurt;if(active.complete&&active.naturalWidth>0)ctx.drawImage(active,playerX,PLAYER_Y,PLAYER_W,PLAYER_H);else{ctx.fillStyle=currentExpression==='hurt'?'#ff0000':(currentExpression==='happy'?'#ffd93d':'#4ecdc4');ctx.fillRect(playerX,PLAYER_Y,PLAYER_W,PLAYER_H)}
+ctx.fillStyle='#fff';ctx.font='16px "Courier New",monospace';ctx.textAlign='left';ctx.fillText(`SCORE ${score}/${TARGET_SCORE}`,12,24);ctx.fillStyle='#e94560';ctx.fillText(`FAILS ${counts.X}/${MAX_FAILS}`,12,48)}
+
+function loopGame(){if(!running)return;updateGame();drawGame();requestAnimationFrame(loopGame)}
+
+function startGame(){
+document.getElementById('dialog-text').innerText="";
+document.getElementById('dialog-box').style.display='none';
+document.getElementById('game-layer').style.display='block';
+document.getElementById('bgmGame').play().catch(()=>{});
+initGameEngine();running=true;drawGame();loopGame();
+}
+
+function endGameEngine(isWin){
+  running=false;
+  document.getElementById('bgmGame').pause();
+  document.getElementById('game-layer').style.display='none';
+  document.getElementById('dialog-box').style.display='flex';
+  document.getElementById('dialog-box').style.opacity = '0';
+  lockClick = true;
+
+  if(!isWin){
+    const fo=document.getElementById('fail-overlay');
+    fo.style.display='block';
+    let isH=false;
+    failAnimInterval=setInterval(()=>{fo.src=isH?'player_hurt.png':'player_normal.png';isH=!isH},150);
+    showDialog(["江山：赶紧再试一次，一次失败有什么了不起？"],()=>{
+      clearInterval(failAnimInterval);fo.style.display='none';startGame();
+    });
+    document.getElementById('dialog-box').style.opacity = '1';
+    lockClick = false;
+    return;
+  }
+
+  // 👇 显示通关过渡界面
+  clearOverlay.style.display = 'flex';
+  setTimeout(()=>{ clearOverlay.classList.add('show'); }, 50);
+
+  setTimeout(()=>{
+    clearOverlay.classList.remove('show');
+    setTimeout(()=>{
+      clearOverlay.style.display = 'none';
       
-      if (activeImg.complete && activeImg.naturalWidth > 0) {
-        ctx.drawImage(activeImg, playerX, PLAYER_Y, PLAYER_W, PLAYER_H);
-      } else {
-        ctx.fillStyle = currentExpression === 'hurt' ? '#ff0000' : (currentExpression === 'happy' ? '#ffd93d' : '#4ecdc4');
-        ctx.fillRect(playerX, PLAYER_Y, PLAYER_W, PLAYER_H);
-      }
+      // 渐变黑屏
+      bgLayer.style.transition = 'background-color 1.5s ease';
+      bgLayer.style.backgroundColor='#000';
+      bgLayer.style.backgroundImage='none';
+      bgLayer.style.filter='brightness(1)';
 
-      ctx.fillStyle = '#fff'; ctx.font = '16px "Courier New", monospace'; ctx.textAlign = 'left';
-      ctx.fillText(`SCORE ${score}/${TARGET_SCORE}`, 12, 24);
-      ctx.fillStyle = '#e94560'; ctx.fillText(`FAILS ${counts.X}/${MAX_FAILS}`, 12, 48);
-    }
-
-    function loop() {
-      if (!running) return;
-      update(); draw(); requestAnimationFrame(loop);
-    }
-
-    function playIntro() {
-      isPlayingIntro = true; introFrame = 0; introPlayerX = -PLAYER_W; 
-      skipBtn.style.display = 'block';
-
-      bgmIntro.volume = 0.5;
-      bgmIntro.play().catch(() => {});
-
-      function introLoop() {
-        if (!isPlayingIntro) return;
-        introFrame++;
-        ctx.fillStyle = '#111116'; ctx.fillRect(0, 0, W, H);
-
-        if (introFrame < 300) {
-          introPlayerX += 1.5; 
-          if (introPlayerX > W / 2 - PLAYER_W / 2) introPlayerX = W / 2 - PLAYER_W / 2; 
-        }
-
-        const isHappyFrame = Math.floor(introFrame / 20) % 2 === 0;
-        if (isHappyFrame && imgHappy.complete) ctx.drawImage(imgHappy, introPlayerX, PLAYER_Y, PLAYER_W, PLAYER_H);
-        else if (imgNormal.complete) ctx.drawImage(imgNormal, introPlayerX, PLAYER_Y, PLAYER_W, PLAYER_H);
-        else { ctx.fillStyle = isHappyFrame ? '#ffd93d' : '#4ecdc4'; ctx.fillRect(introPlayerX, PLAYER_Y, PLAYER_W, PLAYER_H); }
-
-        if (introFrame > 200) {
-          ctx.fillStyle = '#ffd93d'; 
-          ctx.font = 'bold 26px "Courier New", monospace'; 
-          ctx.textAlign = 'center';
-          if (Math.floor(introFrame / 15) % 2 === 0) {
-            ctx.fillText('VRM', W / 2, H / 2 - 80);
-            ctx.fillText('PIXEL CATCH', W / 2, H / 2 - 40);
-          }
-        }
-
-        if (introFrame > 100) {
-          ctx.fillStyle = '#666'; ctx.font = '12px "Courier New", monospace'; ctx.textAlign = 'center';
-          if (Math.floor(introFrame / 20) % 2 === 0) ctx.fillText('LOADING...', W / 2, H - 80);
-        }
-
-        if (introFrame > 360) { endIntro(); return; }
-        requestAnimationFrame(introLoop);
-      }
-      introLoop();
-    }
-
-    function endIntro() {
-      isPlayingIntro = false; skipBtn.style.display = 'none';
-      bgmIntro.pause(); 
-      startScreen.classList.remove('hidden');
-    }
-
-    skipBtn.addEventListener('click', () => { playClick(); endIntro(); });
-
-    function endGame(isClear) {
-      running = false;
-      gameOver = true;
-      endScreen.classList.remove('hidden');
-      bgmGame.pause(); 
-
-      if (isClear) {
-        endTitle.innerText = 'CLEAR!';
-        endTitle.style.color = '#ffd93d';
-        endTitle.style.textShadow = '2px 2px 0 #000';
+      setTimeout(()=>{
+        charLayer.style.display='flex';
+        charLayer.style.opacity='1'; 
+        charImg.src='player_normal.png';
+        charImg.style.display='block';
+        charLayer.style.transform='translateX(-50%) translateY(200px)';
         
-        let isHidden = (counts.A === counts.B && counts.B === counts.C && counts.C === counts.D && counts.A > 0);
+        setTimeout(()=>{
+          charLayer.style.transform='translateX(-50%) translateY(0)';
+        }, 50);
 
-        if (isHidden) {
-          endTitle.innerText = 'HIDDEN ENDING?';
-          endTitle.style.color = '#b388ff';
-          endDesc.innerText = `恭喜你触发了隐藏结局！\n是否解锁？`;
-          albumImg.style.display = 'none'; 
-          hiddenPrompt.style.display = 'flex';
-        } else {
-          currentBest = 'A';
-          ['B', 'C', 'D'].forEach(t => { if (counts[t] > counts[currentBest]) currentBest = t; });
-          
-          albumImg.style.display = 'block';
-          albumImg.src = `album${currentBest}.jpg`; 
-          endDesc.innerText = `接住最多的是 ${ITEM_NAMES[currentBest]}`;
-          
-          playSongBtn.style.display = 'inline-block'; 
-          replayBtn.style.display = 'block';
-        }
-        
-      } else {
-        endTitle.innerText = 'GAME OVER';
-        endTitle.style.color = '#e94560';
-        endTitle.style.textShadow = '2px 2px 0 #ffd93d';
-        endDesc.innerText = `你接了太多炸弹！\n被炸晕了...`;
-        
-        albumImg.style.display = 'none';
-        failAnim.style.display = 'block';
-        replayBtn.style.display = 'block';
-        
-        let isHurtFrame = false;
-        failAnimInterval = setInterval(() => {
-          failAnim.src = isHurtFrame ? 'player_hurt.png' : 'player_normal.png';
-          isHurtFrame = !isHurtFrame;
-        }, 150); 
-        medias.Fail.play().catch(e => console.log('播放被拦截：', e));
-      }
-    }
-
-    function startDanceAnimation() {
-      danceContainer.style.display = 'flex'; 
-      danceState = false;
-      
-      danceInterval = setInterval(() => {
-        danceState = !danceState;
-        if (danceState) {
-          danceFace.src = 'player_happy.png'; 
-          danceMusic.style.display = 'inline-block'; 
-        } else {
-          danceFace.src = 'player_normal.png'; 
-          danceMusic.style.display = 'none'; 
-        }
+        setTimeout(()=>{
+          lockClick = false; 
+          charImg.src='player_happy.png';
+          showDialog(["江山：谢谢大家。","江山：没有大家，就没有今天的我。","（没有你，也不会有此刻的我们......）"],()=>{
+            showDialog(["江山：接下来，请尽情享受属于你的歌曲吧！"],showFinalEndScreen);
+          });
+          document.getElementById('dialog-box').style.opacity = '1'; 
+        }, 2000);
       }, 1500); 
-    }
 
-    playSongBtn.addEventListener('click', () => {
-      playClick();
-      playSongBtn.style.display = 'none'; 
-      loadingHint.style.display = 'block'; 
-      
-      albumImg.classList.add('playing'); 
-      startDanceAnimation(); 
-      
-      medias[currentBest].play().then(() => {
-        loadingHint.style.display = 'none';
-      }).catch(e => {
-        console.log('播放失败：', e);
-        loadingHint.style.display = 'none'; 
-      }); 
-    });
+    }, 1000); // 等 CLEAR 渐隐
+  }, 2500); // CLEAR 停留 2.5 秒
+}
 
-    unlockHiddenBtn.addEventListener('click', () => {
-      playClick();
-      hiddenPrompt.style.display = 'none';
-      endDesc.innerText = `正在播放隐藏旋律...`;
-      hiddenAnim.style.display = 'block';
-      
-      hiddenFrameIndex = 1;
-      hiddenAnim.src = `hidden1.png`;
-      
-      hiddenAnimInterval = setInterval(() => {
-        hiddenFrameIndex++;
-        if (hiddenFrameIndex > 4) hiddenFrameIndex = 1;
-        hiddenAnim.src = `hidden${hiddenFrameIndex}.png`;
-      }, 800);
+function showFinalEndScreen(){
+document.getElementById('dialog-box').style.display='none';
+endScreen.style.display='flex';
+setTimeout(()=>{ endScreen.classList.add('show'); }, 50);
 
-      loadingHint.style.display = 'block'; 
-      startDanceAnimation(); 
-      
-      medias.Hidden.play().then(() => {
-        loadingHint.style.display = 'none'; 
-      }).catch(e => {
-        console.log('播放被拦截：', e);
-        loadingHint.style.display = 'none';
-      });
-      
-      replayBtn.style.display = 'block';
-    });
-
-    skipHiddenBtn.addEventListener('click', () => {
-      playClick();
-      hiddenPrompt.style.display = 'none';
-      let best = 'A';
-      ['B', 'C', 'D'].forEach(t => { if (counts[t] > counts[best]) best = t; });
-      
-      albumImg.style.display = 'block';
-      albumImg.src = `album${best}.jpg`; 
-      endDesc.innerText = `接住最多的是 ${ITEM_NAMES[best]}`;
-      
-      playSongBtn.style.display = 'inline-block'; 
-      replayBtn.style.display = 'block';
-      
-      currentBest = best; 
-    });
-
-    function startGame() {
-      playClick();
-      initGame();
-      startScreen.classList.add('hidden');
-      endScreen.classList.add('hidden');
-      
-      bgmGame.volume = 0.4;
-      bgmGame.play().catch(() => {});
-
-      running = true; draw(); loop();
-    }
-
-    startBtn.addEventListener('click', startGame);
-    replayBtn.addEventListener('click', () => {
-        playClick();
-        endScreen.classList.add('hidden');
-        startGame();
-    });
-
-    window.onload = () => { setTimeout(playIntro, 500); };
-  </script>
+let maxKey='songA',maxVal=weights.songA;['songB','songC','songD'].forEach(k=>{if(weights[k]>maxVal){maxVal=weights[k];maxKey=k}});
+const albumImg=document.getElementById('album-img'),playBtn=document.getElementById('play-song-btn'),danceFace=document.getElementById('dance-face'),danceMusic=document.getElementById('dance-music'),danceContainer=document.getElementById('dance-container');
+albumImg.src=`album${maxKey.replace('song','')}.jpg`;albumImg.style.display='block';playBtn.style.display='block';
+let dState=false;danceContainer.style.display='flex';let dInt=setInterval(()=>{dState=!dState;if(dState){danceFace.src='player_happy.png';danceMusic.style.display='inline-block'}else{danceFace.src='player_normal.png';danceMusic.style.display='none'}},1500);
+playBtn.onclick=()=>{playClick();playBtn.style.display='none';albumImg.classList.add('playing');const audio=document.getElementById('media'+maxKey.replace('song',''));audio.play().catch(()=>{});if(weights.bonus>=2){setTimeout(()=>{document.getElementById('mediaBonus').play().catch(()=>{})},5000)}}
+}
+</script>
 </body>
 </html>
